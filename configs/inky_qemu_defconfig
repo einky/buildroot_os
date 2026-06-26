@@ -1,0 +1,30 @@
+# InkyOS EMULATOR target -- seeded from Buildroot's qemu_aarch64_virt_defconfig.
+#
+# This is the fast/reliable development target: it boots cleanly under
+# `qemu-system-aarch64 -M virt` (clean virtio devices + generated DTB), unlike the
+# Pi `raspi3ap` machine whose serial console emulation is unreliable. Builds a
+# 64-bit ARM kernel + ext4 rootfs. Keep the hardware image (inky_defconfig) for the
+# Pi Zero 2 W; develop against this, validate against hardware.
+#
+# Build (output kept separate from the Pi build via INKY_OUT):
+#   INKY_OUT=output-qemu ./br.sh make inky_qemu_defconfig
+#   INKY_OUT=output-qemu ./br.sh make -j"$(nproc)"
+# The post-image step generates output-qemu/images/start-qemu.sh.
+BR2_aarch64=y
+BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_6_18=y
+BR2_GLOBAL_PATCH_DIR="board/qemu/patches"
+BR2_DOWNLOAD_FORCE_CHECK_HASHES=y
+BR2_SYSTEM_DHCP="eth0"
+BR2_ROOTFS_POST_IMAGE_SCRIPT="board/qemu/post-image.sh"
+BR2_ROOTFS_POST_SCRIPT_ARGS="$(BR2_DEFCONFIG)"
+BR2_LINUX_KERNEL=y
+BR2_LINUX_KERNEL_CUSTOM_VERSION=y
+BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="6.18.7"
+BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="board/qemu/aarch64-virt/linux.config"
+BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
+BR2_TARGET_ROOTFS_EXT2=y
+BR2_TARGET_ROOTFS_EXT2_4=y
+# BR2_TARGET_ROOTFS_TAR is not set
+BR2_PACKAGE_HOST_QEMU=y
+BR2_PACKAGE_HOST_QEMU_SYSTEM_MODE=y
