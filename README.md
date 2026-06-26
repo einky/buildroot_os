@@ -48,6 +48,8 @@ itself is a pinned git submodule that is never edited in place.
 ```
 buildroot_os/
 ├── br.sh                     # containerized Buildroot wrapper (build inside Docker)
+├── build.sh                  # dispatcher: ./build.sh {qemu|pi} -> output-qemu/ | output/
+├── run-qemu.sh               # boot the emulator image on the host (headless serial)
 ├── docker/
 │   └── Dockerfile            # pinned Debian Bookworm build environment
 ├── buildroot/                # Buildroot, as a git submodule (pinned to an LTS tag)
@@ -67,7 +69,8 @@ buildroot_os/
 │   └── renpy/                # Buildroot recipe for the Ren'Py engine
 ├── .dl/                      # download cache (gitignored, persists across builds)
 ├── .ccache/                  # compiler cache (gitignored)
-└── output*/                  # build output (gitignored)
+├── output/                   # HARDWARE build output (gitignored)
+└── output-qemu/              # EMULATOR build output (gitignored)
 ```
 
 ---
@@ -94,20 +97,27 @@ cd buildroot_os
 git submodule update --init --recursive
 
 # 2. (first run only) build the build-environment image, then build the emulator target
-./br.sh make inky_qemu_defconfig
-./br.sh make -j"$(nproc)"
+./build.sh qemu          # -> output-qemu/  (wraps ./br.sh, see below)
 
 # 3. Boot it (see Testing)
+./run-qemu.sh
 ```
 
-All builds go through `./br.sh`, which runs Buildroot inside the container as your own user,
-with persistent download/compiler caches. Examples:
+`build.sh` and `run-qemu.sh` are thin convenience wrappers; everything still goes through
+`./br.sh`, which runs Buildroot inside the container as your own user with persistent
+download/compiler caches. The output directory is selected by `INKY_OUT` (default `output`),
+so the two targets never clobber each other.
 
 ```bash
-./br.sh make menuconfig                  # configure
-./br.sh make -j"$(nproc)"                # build
-./br.sh make linux-rebuild               # rebuild one package
-./br.sh make savedefconfig BR2_DEFCONFIG=/work/configs/inky_defconfig
+./build.sh qemu                          # EMULATOR target -> output-qemu/
+./build.sh pi                            # HARDWARE target -> output/
+./build.sh qemu menuconfig               # extra args pass through to ./br.sh make
+./build.sh pi linux-rebuild              # rebuild one package for the Pi target
+
+# ...or drive ./br.sh directly (INKY_OUT picks the output dir):
+INKY_OUT=output-qemu ./br.sh make inky_qemu_defconfig
+INKY_OUT=output-qemu ./br.sh make -j"$(nproc)"
+./br.sh make savedefconfig BR2_DEFCONFIG=/work/configs/inky_qemu_defconfig
 ./br.sh bash                             # shell inside the build container
 ```
 
@@ -125,6 +135,9 @@ images and are not interchangeable.**
 |---|---|---|
 | Base | `raspberrypizero2w_64_defconfig` | `qemu_aarch64_virt_defconfig` |
 | Machine | real Pi Zero 2 W | `qemu-system-aarch64 -M virt` |
+| Output dir | `output/` | `output-qemu/` |
+| Build | `./build.sh pi` | `./build.sh qemu` |
+| Boot/flash | `dd` the SD image (see Testing) | `./run-qemu.sh` |
 | Boots on the Pi | **yes** — this is the SD image | no |
 | Boots in QEMU | unreliable (raspi machine fidelity) | **yes** — clean every time |
 | Use for | final validation, hardware I/O (GPIO, SPI, e-ink) | day-to-day development of the OS + software stack |
@@ -145,24 +158,31 @@ Develop against the emulator; validate against hardware.
 
 ### Emulator target (recommended for development)
 
-Buildroot generates a ready-made launch script for the `virt` machine:
+Boot the emulator image on the host with the provided wrapper, which auto-detects the kernel
+and rootfs under `output-qemu/images/`:
 
 ```bash
-output-qemu/images/start-qemu.sh        # or wherever your emulator output dir is
+./run-qemu.sh
 ```
 
-If you invoke QEMU manually, the working pattern for `virt` is a single muxed serial console
-to your terminal:
+It runs the exact verified command for the `virt` machine — a single muxed serial console to
+your terminal, no graphics:
 
 ```bash
 qemu-system-aarch64 -M virt -cpu cortex-a53 -m 512 -smp 4 \
   -kernel output-qemu/images/Image \
-  -append "console=ttyAMA0 root=/dev/vda" \
-  -drive file=output-qemu/images/rootfs.ext4,if=virtio,format=raw \
+  -append "rootwait root=/dev/vda console=ttyAMA0" \
+  -drive file=output-qemu/images/rootfs.ext4,if=none,format=raw,id=hd0 \
+  -device virtio-blk-device,drive=hd0 \
+  -netdev user,id=eth0 -device virtio-net-device,netdev=eth0 \
   -serial mon:stdio -display none
 ```
 
-Exit QEMU with **Ctrl-A** then **X**.
+Log in as `root` (no password). Exit QEMU with **Ctrl-A** then **X**.
+
+> Buildroot's `start-qemu.sh` is **not** generated here: its post-image step only emits that
+> script when the defconfig name matches a `# <name>` tag in Buildroot's `readme.txt`, and our
+> renamed `inky_qemu_defconfig` doesn't match. Use `./run-qemu.sh` instead.
 
 ### Hardware target — flashing to SD
 
