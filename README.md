@@ -152,6 +152,54 @@ be validated here, on the board.
 
 Develop against the emulator; validate against hardware.
 
+### Pinned versions
+
+The Ren'Py engine is built from source as Buildroot packages, so its toolchain dependencies
+must line up with Buildroot's bundled Python and Cython. These are pinned in lockstep — bumping
+one means re-checking the others.
+
+| Component | Version | Where it's pinned |
+|---|---|---|
+| Buildroot | `2026.05` (submodule) | `buildroot/` git submodule |
+| Target Python 3 | `3.14.5` | Buildroot `package/python3` (`make python3-show-info`) |
+| Host Cython | `3.1.3` | Buildroot `package/python-cython` (pulled via `host-python-cython`) |
+| Ren'Py | `8.5.2` | `package/renpy/renpy.mk` (renpy.org source tarball) |
+| pygame_sdl2 | `renpy-8.5.2.26010301` | `package/pygame-sdl2/pygame-sdl2.mk` |
+
+Notes:
+
+- **Ren'Py 8.5.2 vendors its own pygame as `renpy.pygame`** (the engine does `import
+  renpy.pygame as pygame`; the standalone `pygame_sdl2` name survives only as a back-compat
+  alias pointing at it). So the `renpy` package does **not** depend on the external
+  `pygame-sdl2` package, and `inky_qemu_defconfig` no longer enables it. `package/pygame-sdl2/`
+  is kept (and still builds/imports) but is currently unused by the engine.
+- The `renpy` build is driven by the engine's own `setup.py` (pkg-config based; `RENPY_CYTHON`
+  names the cross host Cython). Its native modules are built in-place and installed to
+  `/opt/renpy`, made importable via a `renpy.pth`. A build-time `file(1)` guard fails the build
+  unless the compiled `_renpy*.so` is an aarch64 object, catching any host-arch mis-build.
+- **Runtime deps not obvious from the tarball** (all pulled in by `package/renpy/Config.in`):
+  the source release does **not** bundle the pure-Python libs the SDK ships, so the engine
+  needs `python-ecdsa` (imported at startup by `renpy.savetoken`; pulls `python-six`). It also
+  needs Python stdlib C modules `zlib` + `unicodedata` (imported in `renpy.loader`). And SDL2
+  must be built with **`BR2_PACKAGE_SDL2_X11` + `BR2_PACKAGE_SDL2_OPENGL`** — without the X11
+  video backend + GL context support, `renpy.pygame.display.init()` dies with *"No available
+  video device"* even with Xvfb up. (SDL2's default Buildroot config has only the `dummy`
+  driver, which is why an `SDL_VIDEODRIVER=dummy` import test passes but real rendering fails.)
+- **Engine carries one InkyOS patch:** `package/renpy/0001-add-eink-push-callback.patch` adds
+  `config.eink_push_callback` and a single call site in the interact loop, so a game can
+  capture one stable frame per advance for the e-ink display. The bundled `the_question`'s
+  `game/eink_hook.rpy` sets that callback; without the patch the game aborts at init with
+  *"config.eink_push_callback is not a known configuration variable."*
+- **Under the gl2 renderer, Ren'Py first tries `gles2` and fails** (`Could not initialize
+  OpenGL / GLES library`) — expected, because llvmpipe exposes desktop GL, not GLES — then
+  succeeds on `gl2`/llvmpipe. The gles2 failure line in `log.txt` is benign.
+- pygame_sdl2's `setuplib.py` imports `setuptools` (not the removed `distutils`) and Cython
+  regenerates the C with `--3str`, so the 8.5.x line builds cleanly against Python 3.14 /
+  Cython 3.1. Older Ren'Py releases need Cython 0.29 and throw `noexcept` Cython errors — do
+  not pin those.
+- The pin matches the Ren'Py **8.5.2** SDK studied alongside this repo. `8.5.3` is the latest
+  upstream tag; bump both packages together if moving to it.
+
 ---
 
 ## Testing
@@ -217,11 +265,15 @@ Built in verifiable phases, each gated by a checkpoint.
 - [ ] **Phase 1 — Minimal boot.** Boots to a login prompt in the emulator and on hardware.
 - [ ] **Phase 2 — Graphics stack.** Mesa llvmpipe + Xvfb + SDL2; `glxinfo` reports the
       `llvmpipe` renderer (the critical GLX checkpoint).
-- [ ] **Phase 3 — Ren'Py from source.** `pygame-sdl2` and `renpy` build as Buildroot
-      packages; a trivial game renders headless. `./br.sh make renpy-rebuild` recompiles the
-      engine.
+- [x] **Phase 3 — Ren'Py from source.** `renpy` builds as a Buildroot package and
+      `the_question` renders headless on the emulator: Ren'Py's `gl2` renderer comes up on
+      Mesa **llvmpipe** (desktop GL 4.6) under Xvfb and draws the main menu, zero tracebacks.
+      `./br.sh make renpy-rebuild` recompiles the engine. (`pygame-sdl2` is packaged but
+      unused — 8.5.2 vendors its own `renpy.pygame`; see Pinned versions.) Verified by
+      capturing the Xvfb framebuffer; see the captured frame in the session notes.
 - [ ] **Phase 4 — Boot-to-game + input.** Session launcher + GPIO→uinput bridge; power-on →
-      game → buttons navigate.
+      game → buttons navigate. (The game ships now via a rootfs overlay at
+      `board/qemu/overlay/opt/the_question`; what's left is auto-launching it at boot.)
 - [ ] **Phase 5 — Hardening.** Read-only root + writable data partition for save survival.
 
 ---
@@ -237,6 +289,9 @@ Built in verifiable phases, each gated by a checkpoint.
 | `Couldn't open dtb file …rpi-3-b.dtb` | wrong DTB name — `ls output/images/*.dtb` and use the actual one (`bcm2710-rpi-zero-2-w.dtb`) |
 | `-serial stdio: cannot use stdio by multiple character devices` | drop `-serial stdio` when using `-nographic`, or use `-serial mon:stdio -display none` |
 | raspi target silent in QEMU (CPU pegged, no output) | known raspi-machine console fidelity issue — **use the emulator (`virt`) target instead** |
+| Ren'Py: `No available video device` | SDL2 built without the X11 backend — enable `BR2_PACKAGE_SDL2_X11` + `BR2_PACKAGE_SDL2_OPENGL`, then `sdl2-dirclean` and rebuild (config-only changes don't auto-rebuild a package) |
+| Ren'Py: `config.X is not a known configuration variable` | game sets a config var the engine doesn't define — carry an engine patch under `package/renpy/*.patch` (see the eink callback patch) |
+| Python `ModuleNotFoundError` for `zlib`/`unicodedata` after enabling the option | python3 was built before the sub-option — `python3-dirclean` + rebuild |
 | Output files owned by root | should not happen with `br.sh`'s `--user`; confirm it's present |
 
 ---

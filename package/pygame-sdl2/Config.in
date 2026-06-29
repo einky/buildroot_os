@@ -1,0 +1,29 @@
+config BR2_PACKAGE_PYGAME_SDL2
+	bool "pygame_sdl2"
+	depends on BR2_PACKAGE_PYTHON3
+	depends on BR2_INSTALL_LIBSTDCPP # SDL2_image -> Mesa/llvm pulls libstdc++
+	select BR2_PACKAGE_SDL2
+	select BR2_PACKAGE_SDL2_IMAGE
+	select BR2_PACKAGE_SDL2_TTF
+	select BR2_PACKAGE_SDL2_MIXER
+	select BR2_PACKAGE_SDL2_GFX
+	select BR2_PACKAGE_JPEG
+	select BR2_PACKAGE_LIBPNG
+	# pygame_sdl2.image calls IMG_Init() for JPG/PNG/WEBP at import and raises
+	# if none initialise; SDL2_image only builds a loader when its backing lib
+	# is enabled. WEBP is also used directly by the Ren'Py engine.
+	select BR2_PACKAGE_WEBP
+	help
+	  pygame_sdl2 is Ren'Py's reimplementation of the pygame API on
+	  top of SDL2. It is the SDL2 binding layer the Ren'Py engine is
+	  built on; the renpy package #includes the C headers this package
+	  installs into staging.
+
+	  Built from the renpy/pygame_sdl2 source with host Cython, pinned
+	  to the tag matching the Ren'Py release used by InkyOS.
+
+	  https://github.com/renpy/pygame_sdl2
+
+comment "pygame_sdl2 needs a toolchain w/ C++"
+	depends on BR2_PACKAGE_PYTHON3
+	depends on !BR2_INSTALL_LIBSTDCPP

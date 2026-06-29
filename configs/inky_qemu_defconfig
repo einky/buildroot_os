@@ -1,9 +1,12 @@
-# InkyOS EMULATOR target -- seeded from Buildroot's qemu_aarch64_virt_defconfig,
-# plus the Ren'Py graphics stack: Mesa software desktop GL (llvmpipe gallium driver,
-# GLX+EGL), X.org server with Xvfb, and the SDL2 family. C++ toolchain + ccache are
-# on because the Mesa/LLVM build needs C++ and is large.
-# Build: INKY_OUT=output-qemu ./br.sh make inky_qemu_defconfig && ... make -j$(nproc)
-# (regenerate this file with `make savedefconfig` -- it drops these comments.)
+# InkyOS EMULATOR target -- seeded from Buildroot's qemu_aarch64_virt_defconfig.
+# Graphics stack: Mesa software desktop GL (llvmpipe gallium driver, GLX+EGL), X.org
+# server with Xvfb, and the SDL2 family. Ren'Py engine layer: the renpy package on
+# Python 3. Ren'Py 8.5.2 vendors its own pygame (renpy.pygame) and its native
+# modules pull in sdl2/sdl2_image/ffmpeg/harfbuzz/freetype/fribidi/assimp/png/jpeg/zlib
+# via the renpy Config.in selects, so those need no explicit lines here. C++ toolchain
+# + ccache are on because the Mesa/LLVM build needs C++ and is large.
+# Build: INKY_OUT=output-qemu ./br.sh make inky_qemu_defconfig && ... make -j4
+# (regenerate with `make savedefconfig` -- it drops these comments and any selected syms.)
 BR2_aarch64=y
 BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_6_18=y
 BR2_TOOLCHAIN_BUILDROOT_CXX=y
@@ -11,6 +14,7 @@ BR2_CCACHE=y
 BR2_GLOBAL_PATCH_DIR="board/qemu/patches"
 BR2_DOWNLOAD_FORCE_CHECK_HASHES=y
 BR2_SYSTEM_DHCP="eth0"
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_INKY_PATH)/board/qemu/overlay"
 BR2_ROOTFS_POST_IMAGE_SCRIPT="board/qemu/post-image.sh"
 BR2_ROOTFS_POST_SCRIPT_ARGS="$(BR2_DEFCONFIG)"
 BR2_LINUX_KERNEL=y
@@ -25,19 +29,19 @@ BR2_PACKAGE_MESA3D_LLVM=y
 BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LLVMPIPE=y
 BR2_PACKAGE_MESA3D_OPENGL_GLX=y
 BR2_PACKAGE_MESA3D_OPENGL_EGL=y
-BR2_PACKAGE_SDL2=y
-BR2_PACKAGE_SDL2_GFX=y
-BR2_PACKAGE_SDL2_IMAGE=y
-BR2_PACKAGE_SDL2_MIXER=y
-BR2_PACKAGE_SDL2_TTF=y
 BR2_PACKAGE_XORG7=y
 BR2_PACKAGE_XSERVER_XORG_SERVER=y
 BR2_PACKAGE_XSERVER_XORG_SERVER_XVFB=y
+BR2_PACKAGE_PYTHON3=y
 BR2_TARGET_ROOTFS_EXT2=y
 BR2_TARGET_ROOTFS_EXT2_4=y
-# Default ext2 size (60M) overflows: Mesa+LLVM (libLLVM.so ~63M) + X + SDL2 make the
-# rootfs ~120M. 512M leaves headroom for the Ren'Py engine + a game later.
-BR2_TARGET_ROOTFS_EXT2_SIZE="512M"
+# Default ext2 size (60M) overflows: Mesa+LLVM (libLLVM.so ~63M) + X + SDL2 + Python3
+# + pygame_sdl2 + the Ren'Py engine tree, ffmpeg, assimp, harfbuzz and Pillow push the
+# rootfs past 512M. 1G leaves headroom for a bundled game later.
+BR2_TARGET_ROOTFS_EXT2_SIZE="1G"
 # BR2_TARGET_ROOTFS_TAR is not set
 BR2_PACKAGE_HOST_QEMU=y
 BR2_PACKAGE_HOST_QEMU_SYSTEM_MODE=y
+BR2_PACKAGE_RENPY=y
+# Runtime dep of the device frame-capture path (not a renpy build dep).
+BR2_PACKAGE_PYTHON_PILLOW=y

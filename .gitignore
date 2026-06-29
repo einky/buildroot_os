@@ -3,3 +3,17 @@
 /.dl/
 /.ccache/
 /.home/
+
+# Ren'Py-generated artifacts in bundled game overlays. The .rpy sources and real
+# assets (images, audio) are tracked; bytecode and runtime state are derived.
+# NOTE: these are copied verbatim into the rootfs, so a fresh-clone image ships
+# without bytecode and Ren'Py recompiles on first launch (fine while root is
+# writable; precompile at build time before Phase 5's read-only root).
+*.rpyc
+*.rpymc
+*.rpyb
+**/the_question/game/saves/
+**/the_question/game/cache/
+**/the_question/log.txt
+**/the_question/traceback.txt
+**/the_question/errors.txt

@@ -1,0 +1,44 @@
+config BR2_PACKAGE_RENPY
+	bool "renpy"
+	depends on BR2_PACKAGE_PYTHON3
+	depends on BR2_INSTALL_LIBSTDCPP # assimp, harfbuzz, renpy.gl2.assimp (C++)
+	depends on BR2_USE_WCHAR # assimp
+	depends on BR2_TOOLCHAIN_GCC_AT_LEAST_7 # assimp
+	# Native engine modules (pkg-config driven build, see renpy.mk):
+	select BR2_PACKAGE_FFMPEG
+	select BR2_PACKAGE_FFMPEG_SWSCALE
+	select BR2_PACKAGE_HARFBUZZ
+	select BR2_PACKAGE_FREETYPE
+	select BR2_PACKAGE_LIBFRIBIDI
+	select BR2_PACKAGE_ASSIMP
+	select BR2_PACKAGE_SDL2
+	# SDL2 needs the X11 video backend (to open a window under Xvfb/X) and the
+	# OpenGL backend (Ren'Py's GL2 renderer creates an SDL GL context via
+	# SDL_GL_CreateContext). Without these SDL2 has only the dummy driver and
+	# renpy.pygame.display.init() fails with "No available video device".
+	select BR2_PACKAGE_SDL2_X11
+	select BR2_PACKAGE_SDL2_OPENGL
+	select BR2_PACKAGE_SDL2_IMAGE
+	select BR2_PACKAGE_JPEG
+	select BR2_PACKAGE_LIBPNG
+	select BR2_PACKAGE_ZLIB
+	# Pure-Python runtime deps not in the source tarball (the SDK ships them):
+	select BR2_PACKAGE_PYTHON_ECDSA # renpy.savetoken, imported at startup (pulls python-six)
+	# Python stdlib C modules the engine imports at startup:
+	select BR2_PACKAGE_PYTHON3_ZLIB # renpy.loader (rpyc/archive decompression)
+	select BR2_PACKAGE_PYTHON3_UNICODEDATA # renpy.loader / text
+	# NOTE: 8.5.2 vendors its own pygame as renpy.pygame (the engine does
+	# `import renpy.pygame as pygame`); the external pygame-sdl2 package is not
+	# used, so it is intentionally NOT selected here.
+	help
+	  Ren'Py is a Python-based visual-novel engine. This builds the
+	  engine's native (Cython) modules from the renpy.org source
+	  release and installs the engine tree under /opt/renpy, made
+	  importable by the target's python3.
+
+	  https://www.renpy.org/
+
+comment "renpy needs a toolchain w/ C++, wchar, gcc >= 7"
+	depends on BR2_PACKAGE_PYTHON3
+	depends on !BR2_INSTALL_LIBSTDCPP || !BR2_USE_WCHAR \
+		|| !BR2_TOOLCHAIN_GCC_AT_LEAST_7

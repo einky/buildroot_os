@@ -1,0 +1,67 @@
+Add config.eink_push_callback and an interact-loop call site.
+
+InkyOS drives an external e-ink display by capturing one stable Ren'Py frame per
+dialogue advance / choice. This adds a config hook (default None, so it is a known
+config variable and games may set it) plus a single call site in Interface.interact
+that fires the callback with the current surftree once the screen has settled and the
+engine is about to block on input -- but only when a new surftree was rendered since
+the last push, so input/timer wakeups with no visual change are skipped.
+
+Carried by InkyOS (the game's game/eink_hook.rpy sets config.eink_push_callback).
+
+Signed-off-by: InkyOS <noreply@inky>
+
+--- a/renpy/config.py
++++ b/renpy/config.py
+@@ -208,6 +208,13 @@
+ # A list of functions that are called when an interaction is started.
+ start_interact_callbacks = []
+ 
++# A callback invoked once per interaction, the moment the screen has
++# settled and the engine is about to block on user input. It is called
++# with the engine's current surftree (a renpy.display.render.Render).
++# Intended for external displays (e-ink, capture, streaming) that want
++# exactly one stable frame per dialogue advance / choice. May be None.
++eink_push_callback = None
++
+ # A list of functions that are called when a say statement
+ # is sustained.
+ say_sustain_callbacks = []
+--- a/renpy/display/core.py
++++ b/renpy/display/core.py
+@@ -765,6 +765,10 @@
+         # Is this the first frame?
+         self.first_frame = True
+ 
++        # Tracks the last surftree pushed via eink_push_callback so we only
++        # fire when a new frame was actually rendered.
++        self._eink_last_surftree = None
++
+         # Should prediction be forced? This causes the prediction coroutine to
+         # be prioritized, and is set to False when it's done, when preloading
+         # is done, or at the end of the interaction.
+@@ -3001,6 +3005,24 @@
+                     renpy.plog(1, "post peek {!r}", ev)
+                 else:
+                     renpy.plog(1, "pre wait")
++
++                    # The screen has settled and we're about to block on
++                    # input — this is the "stable frame" hook point.
++                    # Only fire when draw_screen produced a new surftree since
++                    # the last push, so timer/mouse wakeups with no visual
++                    # change are silently skipped.
++                    if (
++                        renpy.config.eink_push_callback is not None
++                        and self.surftree is not None
++                        and self.surftree is not self._eink_last_surftree
++                    ):
++                        try:
++                            renpy.config.eink_push_callback(self.surftree)
++                            self._eink_last_surftree = self.surftree
++                        except Exception:
++                            if renpy.config.debug:
++                                raise
++
+                     ev = self.event_wait()
+                     renpy.plog(1, "post wait {!r}", ev)
+ 
