@@ -271,9 +271,14 @@ Built in verifiable phases, each gated by a checkpoint.
       `./br.sh make renpy-rebuild` recompiles the engine. (`pygame-sdl2` is packaged but
       unused — 8.5.2 vendors its own `renpy.pygame`; see Pinned versions.) Verified by
       capturing the Xvfb framebuffer; see the captured frame in the session notes.
-- [ ] **Phase 4 — Boot-to-game + input.** Session launcher + GPIO→uinput bridge; power-on →
-      game → buttons navigate. (The game ships now via a rootfs overlay at
-      `board/qemu/overlay/opt/the_question`; what's left is auto-launching it at boot.)
+- [~] **Phase 4 — Boot-to-game + input.** *Session launcher done* (emulator): the
+      `inky-session` package installs a BusyBox-init service (`S95inky-session`) that brings up
+      Xvfb and supervises Ren'Py, so a clean boot lands on the_question's main menu with no
+      manual launch (verified by capturing the framebuffer post-boot). Buildroot's stock
+      `S40xorg` is removed by `board/qemu/post-build.sh` (the appliance uses Xvfb, not a
+      VT-bound Xorg). *Remaining:* the GPIO→uinput input bridge — hardware-only, can't be
+      exercised on the GPIO-less `virt` machine; on the emulator input is driven over
+      `input_hook.rpy`'s socket via `input_sender.py`.
 - [ ] **Phase 5 — Hardening.** Read-only root + writable data partition for save survival.
 
 ---

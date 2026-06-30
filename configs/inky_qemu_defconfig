@@ -15,6 +15,9 @@ BR2_GLOBAL_PATCH_DIR="board/qemu/patches"
 BR2_DOWNLOAD_FORCE_CHECK_HASHES=y
 BR2_SYSTEM_DHCP="eth0"
 BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_INKY_PATH)/board/qemu/overlay"
+# Absolute path: a bare "board/qemu/..." would resolve against Buildroot's own
+# tree (where the stock qemu post-image.sh lives), not this external tree.
+BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_INKY_PATH)/board/qemu/post-build.sh"
 BR2_ROOTFS_POST_IMAGE_SCRIPT="board/qemu/post-image.sh"
 BR2_ROOTFS_POST_SCRIPT_ARGS="$(BR2_DEFCONFIG)"
 BR2_LINUX_KERNEL=y
@@ -43,5 +46,7 @@ BR2_TARGET_ROOTFS_EXT2_SIZE="1G"
 BR2_PACKAGE_HOST_QEMU=y
 BR2_PACKAGE_HOST_QEMU_SYSTEM_MODE=y
 BR2_PACKAGE_RENPY=y
+# Boot-to-game session: Xvfb + supervised Ren'Py, started at boot.
+BR2_PACKAGE_INKY_SESSION=y
 # Runtime dep of the device frame-capture path (not a renpy build dep).
 BR2_PACKAGE_PYTHON_PILLOW=y

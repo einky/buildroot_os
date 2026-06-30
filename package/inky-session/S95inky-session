@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Start the InkyOS game session (Xvfb + supervised Ren'Py).
+# Runs late (S95) so the network/X stack is already up.
+#
+DAEMON=/usr/bin/inky-session
+PIDFILE=/var/run/inky-session.pid
+
+case "$1" in
+	start)
+		printf "Starting InkyOS session: "
+		start-stop-daemon -S -q -b -m -p "$PIDFILE" --exec "$DAEMON"
+		[ $? = 0 ] && echo "OK" || echo "FAIL"
+		;;
+	stop)
+		printf "Stopping InkyOS session: "
+		start-stop-daemon -K -q -p "$PIDFILE"
+		# Tear down the children the supervisor spawned.
+		pkill -f '[r]enpy.py' 2>/dev/null
+		pkill -x Xvfb 2>/dev/null
+		echo "OK"
+		;;
+	restart|reload)
+		"$0" stop
+		sleep 1
+		"$0" start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac
