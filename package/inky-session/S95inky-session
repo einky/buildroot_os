@@ -15,7 +15,13 @@ case "$1" in
 	stop)
 		printf "Stopping InkyOS session: "
 		start-stop-daemon -K -q -p "$PIDFILE"
-		# Tear down the children the supervisor spawned.
+		# Kill the supervisor + its restart loops first (match the daemon path,
+		# not this S95 script), then the children they spawned, so nothing is
+		# relaunched mid-teardown.
+		pkill -f '/usr/bin/inky-session' 2>/dev/null
+		pkill -f '[i]nky-eink-receiver' 2>/dev/null
+		pkill -f 'input.net_sender' 2>/dev/null
+		pkill -f '[i]nky-input' 2>/dev/null
 		pkill -f '[r]enpy.py' 2>/dev/null
 		pkill -x Xvfb 2>/dev/null
 		echo "OK"

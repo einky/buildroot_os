@@ -1,15 +1,25 @@
 config BR2_PACKAGE_INKY_SESSION
 	bool "inky-session"
 	depends on BR2_PACKAGE_RENPY
+	depends on BR2_PACKAGE_INKY_RUNTIME
 	depends on BR2_PACKAGE_XSERVER_XORG_SERVER_XVFB
 	help
 	  InkyOS boot-to-game session. Installs a BusyBox-init service
-	  (S95inky-session) that starts the Xvfb virtual display and
-	  supervises the Ren'Py game under /opt/the_question, restarting
-	  it on exit -- so the device boots straight into the game and
-	  never drops to a shell.
+	  (S95inky-session) that starts the Xvfb virtual display, the
+	  einky runtime consumers (inky-eink-receiver for the e-ink frame
+	  pipeline + the input bridge), and supervises the Ren'Py game
+	  under /opt/the_question, restarting it on exit -- so the device
+	  boots straight into the game and never drops to a shell.
 
-	  The game itself ships via a rootfs overlay, not this package.
+	  This is what wires the in-engine eink_hook.rpy / input_hook.rpy
+	  to the runtime package (ADR 0008). Per-target behaviour (SPI vs
+	  emulator preview, GPIO vs in-engine input) is selected by
+	  /etc/default/inky-session, shipped from the board overlay.
 
-comment "inky-session needs renpy + Xvfb"
-	depends on !BR2_PACKAGE_RENPY || !BR2_PACKAGE_XSERVER_XORG_SERVER_XVFB
+	  The game itself is assembled at build time (stock the_question
+	  pulled from the renpy package + the InkyOS hooks layered on top
+	  by the board post-build script), not vendored in git.
+
+comment "inky-session needs renpy + inky-runtime + Xvfb"
+	depends on !BR2_PACKAGE_RENPY || !BR2_PACKAGE_INKY_RUNTIME \
+		|| !BR2_PACKAGE_XSERVER_XORG_SERVER_XVFB

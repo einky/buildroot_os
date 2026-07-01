@@ -34,10 +34,12 @@ echo
 # Headless serial console (-serial mon:stdio -display none): the kernel console and
 # the QEMU monitor are muxed onto this terminal. rootwait waits for the virtio-blk
 # device; root is on /dev/vda. This is the exact command verified to reach a login prompt.
+# hostfwd tcp::5333 exposes the guest e-ink frame preview (inky-eink-receiver's
+# TcpFrameSink) to a host preview tool at localhost:5333.
 exec qemu-system-aarch64 -M virt -cpu cortex-a53 -m 512 -smp 4 \
   -kernel "$KERNEL" \
   -append "rootwait root=/dev/vda console=ttyAMA0" \
   -drive "file=$ROOTFS,if=none,format=raw,id=hd0" \
   -device virtio-blk-device,drive=hd0 \
-  -netdev user,id=eth0 -device virtio-net-device,netdev=eth0 \
+  -netdev user,id=eth0,hostfwd=tcp::5333-:5333 -device virtio-net-device,netdev=eth0 \
   -serial mon:stdio -display none

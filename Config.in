@@ -1,4 +1,5 @@
 # InkyOS external package menus get sourced here as they're added.
 source "$BR2_EXTERNAL_INKY_PATH/package/pygame-sdl2/Config.in"
 source "$BR2_EXTERNAL_INKY_PATH/package/renpy/Config.in"
+source "$BR2_EXTERNAL_INKY_PATH/package/inky-runtime/Config.in"
 source "$BR2_EXTERNAL_INKY_PATH/package/inky-session/Config.in"

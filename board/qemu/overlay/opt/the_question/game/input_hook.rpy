@@ -1,11 +1,15 @@
-# Receives key commands from an external sender over a unix socket and
-# injects them into Ren'Py's event system.
-# Pairs with input_sender.py at the repo root.
+# InkyOS in-engine input hook.
 #
-# Wire protocol: one ASCII command per line (LF-terminated).
-# Commands: up  down  left  right  enter  escape
+# Serves $RENPY_INPUT_SOCKET ([protocol.engine_capture] input_socket) and turns
+# each incoming button NAME into the Ren'Py keymap event(s) it maps to. The wire
+# format is the shared `ascii-lines` encoding (one button name per line); the
+# names and their renpy_events come straight from meta/shared/hardware.toml.
 #
-# Socket path is overridable via RENPY_INPUT_SOCKET env var.
+# The runtime side that feeds this socket is started by inky-session
+# (emulator: `python -m input.net_sender`; hardware uses the GPIO->xdotool path
+# instead). See ADR 0008.
+#
+# Socket path is overridable via RENPY_INPUT_SOCKET.
 
 init python:
     import socket
@@ -19,26 +23,18 @@ init python:
         "buf":    b"",
     }
 
-    # Simple name → Ren'Py keymap event name(s).
-    # Values may be a string or a list — queue_event accepts both.
+    # Button NAME -> renpy_events, derived from meta/shared/hardware.toml.
+    # >>> GENERATED button-map (scripts/gen_hardware.py --check enforces parity) >>>
     _INPUT_COMMAND_MAP = {
-        "up":         "focus_up",
-        "down":       "focus_down",
-        "left":       "focus_left",
-        "right":      "focus_right",
-        # K_RETURN fires dismiss + button_select + bar_activate/deactivate
-        "enter":      ["dismiss", "button_select", "bar_activate", "bar_deactivate"],
-        # K_SPACE fires only dismiss (advances dialog, does NOT click buttons)
-        "space":      "dismiss",
-        "escape":     "game_menu",
-        # Allow raw keymap names through as well
-        "dismiss":    "dismiss",
-        "game_menu":  "game_menu",
-        "focus_up":   "focus_up",
-        "focus_down": "focus_down",
-        "focus_left": "focus_left",
-        "focus_right":"focus_right",
+        "up": ["focus_up"],
+        "down": ["focus_down"],
+        "left": ["focus_left"],
+        "right": ["focus_right"],
+        "a": ["dismiss"],
+        "b": ["game_menu"],
+        "start": ["dismiss", "button_select", "bar_activate", "bar_deactivate"],
     }
+    # <<< GENERATED button-map <<<
 
     def _input_init():
         if os.path.exists(_input_sock_path):
@@ -55,6 +51,15 @@ init python:
         except OSError:
             pass
         _input_state["server"] = server
+
+    def _input_dispatch(name):
+        # hardware.toml values are lists; renpy.queue_event takes one event name
+        # at a time, so queue each in order.
+        events = _INPUT_COMMAND_MAP.get(name)
+        if not events:
+            return
+        for event_name in events:
+            renpy.queue_event(event_name)
 
     def _input_periodic():
         state = _input_state
@@ -90,10 +95,8 @@ init python:
         # Process every complete line in the buffer
         while b"\n" in state["buf"]:
             line, state["buf"] = state["buf"].split(b"\n", 1)
-            cmd = line.strip().decode("utf-8", errors="ignore").lower()
-            event_name = _INPUT_COMMAND_MAP.get(cmd)
-            if event_name:
-                renpy.queue_event(event_name)
+            name = line.strip().decode("ascii", errors="ignore").lower()
+            _input_dispatch(name)
 
     _input_init()
     config.periodic_callbacks.append(_input_periodic)

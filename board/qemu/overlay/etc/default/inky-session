@@ -1,0 +1,15 @@
+# InkyOS session configuration -- QEMU emulator target.
+# Sourced by /usr/bin/inky-session. See package/inky-session/inky-session.sh.
+
+# Frame pipeline: preview over TCP. TcpFrameSink binds the port and drops frames
+# while no client is attached, so the receiver never blocks on a headless box. A
+# host preview tool can attach via a QEMU port-forward to EINK_TCP_PORT.
+EINK_BACKEND=tcp
+EINK_TCP_HOST=0.0.0.0
+EINK_TCP_PORT=5333
+
+# Input: in-engine socket path. Write button NAMES (one per line, from
+# meta/shared/hardware.toml: up/down/left/right/a/b/start) into INPUT_FIFO and
+# runtime's net_sender forwards them to input_hook.rpy, which queues the events.
+INPUT_MODE=net_sender
+INPUT_FIFO=/run/inky-input

@@ -36,18 +36,37 @@ mkdir -p "$REPO/.dl" "$REPO/.ccache" "$REPO/.home" "$REPO/$INKY_OUT"
 TTY_FLAGS=(-i)
 [ -t 0 ] && TTY_FLAGS=(-it)
 
+# Consume the sibling `runtime` checkout (ADR 0008) when present: mount it at
+# /runtime (read-only) and build the inky-runtime package from it via Buildroot's
+# OVERRIDE_SRCDIR, so the private repo needs no network/credentials. Without the
+# sibling, inky-runtime falls back to its pinned git source.
+RUNTIME_SRC="$(cd "$REPO/.." && pwd)/runtime"
+RUNTIME_MOUNT=()
+MAKE_OVERRIDE=()
+if [ -d "$RUNTIME_SRC" ]; then
+  RUNTIME_MOUNT=(-v "$RUNTIME_SRC":/runtime:ro)
+  MAKE_OVERRIDE=(INKY_RUNTIME_OVERRIDE_SRCDIR=/runtime)
+fi
+
 DOCKER_RUN=(docker run --rm "${TTY_FLAGS[@]}"
   --user "$(id -u):$(id -g)"
   -e HOME=/work/.home
   -e BR2_DL_DIR=/work/.dl
   -e BR2_CCACHE_DIR=/work/.ccache
+  "${RUNTIME_MOUNT[@]}"
   -v "$REPO":/work
   -w /work
   "$IMAGE")
 
 if [ "${1:-}" = "make" ]; then
   shift
-  exec "${DOCKER_RUN[@]}" make -C buildroot BR2_EXTERNAL=/work O="/work/$INKY_OUT" "$@"
+  # Contract/pin parity (ADR 0008). Runs on the host (needs ../meta + python3);
+  # both checks skip gracefully if meta is absent. Bypass with INKY_SKIP_CHECKS=1.
+  if [ -z "${INKY_SKIP_CHECKS:-}" ] && command -v python3 >/dev/null 2>&1; then
+    python3 "$REPO/scripts/check_pins.py"
+    python3 "$REPO/scripts/gen_hardware.py" --check
+  fi
+  exec "${DOCKER_RUN[@]}" make -C buildroot BR2_EXTERNAL=/work O="/work/$INKY_OUT" "$@" "${MAKE_OVERRIDE[@]}"
 else
   exec "${DOCKER_RUN[@]}" "$@"
 fi

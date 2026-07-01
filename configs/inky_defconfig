@@ -15,6 +15,15 @@ BR2_LINUX_KERNEL_DTS_SUPPORT=y
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="broadcom/bcm2710-rpi-zero-2-w"
 BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
 BR2_PACKAGE_BUSYBOX_SHOW_OTHERS=y
+# einky runtime (ADR 0008), hardware target: SPI panel driver + GPIO input.
+# NOTE: inky-runtime depends on BR2_PACKAGE_PYTHON3, which this minimal Pi image
+# does not enable yet (the graphics/Ren'Py/Python stack is still WIP for the Pi
+# -- see README "Project status"). These lines are therefore inert until that
+# stack lands; once python3 + Ren'Py are enabled here they activate the on-device
+# frame pipeline + SPI driver. The emulator (inky_qemu_defconfig) exercises the
+# full path today.
+BR2_PACKAGE_INKY_RUNTIME=y
+BR2_PACKAGE_INKY_RUNTIME_SPI=y
 BR2_PACKAGE_XZ=y
 BR2_PACKAGE_RPI_FIRMWARE=y
 BR2_PACKAGE_RPI_FIRMWARE_BOOTCODE_BIN=y

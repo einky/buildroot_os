@@ -1,0 +1,48 @@
+config BR2_PACKAGE_INKY_RUNTIME
+	bool "inky-runtime"
+	depends on BR2_PACKAGE_PYTHON3
+	select BR2_PACKAGE_PYTHON_NUMPY   # frame_processor dither/pack
+	select BR2_PACKAGE_PYTHON_PILLOW  # eink_receiver PNG decode
+	help
+	  The einky `runtime`: the single owner of the e-ink frame
+	  pipeline (capture -> Floyd-Steinberg dither -> 1-bit pack ->
+	  dispatch), the SPI panel driver, and the GPIO/keymap input
+	  bridge (ADR 0008). InkyOS does NOT reimplement any of that --
+	  it builds and installs `runtime` and runs its console scripts:
+
+	    inky-eink-receiver  in-engine path: decode PNGs pushed by
+	                        Ren'Py's eink_push_callback over the
+	                        engine-capture socket, then dither +
+	                        dispatch them (no second dither).
+	    inky-frame          Xvfb capture -> dither -> dispatch.
+	    inky-input          GPIO / TCP button reader -> keypress.
+
+	  The package is sourced from the runtime repo (pinned commit;
+	  override with INKY_RUNTIME_OVERRIDE_SRCDIR for a local checkout
+	  -- ./br.sh wires this automatically when ../runtime exists).
+
+	  https://github.com/einky/runtime
+
+if BR2_PACKAGE_INKY_RUNTIME
+
+config BR2_PACKAGE_INKY_RUNTIME_SPI
+	bool "on-device SPI panel + GPIO input (hardware target)"
+	select BR2_PACKAGE_PYTHON_CFFI      # _spi_driver runtime import
+	select BR2_PACKAGE_PYTHON_GPIOZERO  # input.handler GPIO reader
+	select BR2_PACKAGE_PYTHON_RPI_GPIO  # gpiozero pin factory on the Pi
+	select BR2_PACKAGE_XDOTOOL          # input.handler keysym injection
+	help
+	  Cross-compile the GDEM0397T81P SPI driver C extension
+	  (runtime's CFFI _spi_driver) and pull in the GPIO input
+	  dependencies. Enable for the Raspberry Pi hardware target
+	  (EINKY_BACKEND=spi, GPIO->xdotool input).
+
+	  Leave this OFF for the QEMU emulator: there it drives the
+	  tcp/socket preview backend and feeds input through the
+	  in-engine input socket (runtime's net_sender), so neither the
+	  C driver nor GPIO is needed.
+
+endif
+
+comment "inky-runtime needs python3"
+	depends on !BR2_PACKAGE_PYTHON3

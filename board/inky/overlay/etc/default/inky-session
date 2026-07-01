@@ -1,0 +1,15 @@
+# InkyOS session configuration -- Raspberry Pi hardware target.
+# Sourced by /usr/bin/inky-session. See package/inky-session/inky-session.sh.
+#
+# Groundwork for the hardware boot-to-game path: this overlay activates once the
+# Pi defconfig grows the python3/Ren'Py/Xvfb stack (README "Project status").
+
+# Frame pipeline: push to the GDEM0397T81P over SPI via runtime's C driver.
+EINK_BACKEND=spi
+EINK_SPI_DEV=/dev/spidev0.0
+
+# Input: GPIO buttons -> runtime input handler (gpiozero) -> xdotool keysyms.
+INPUT_MODE=gpio
+# gpiozero pin factory: RPi.GPIO (python-rpi-gpio); lgpio is not packaged in
+# Buildroot. Must be exported so the inky-input child process sees it.
+export GPIOZERO_PIN_FACTORY=rpigpio

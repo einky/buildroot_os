@@ -4,11 +4,12 @@
 /.ccache/
 /.home/
 
-# Ren'Py-generated artifacts in bundled game overlays. The .rpy sources and real
-# assets (images, audio) are tracked; bytecode and runtime state are derived.
-# NOTE: these are copied verbatim into the rootfs, so a fresh-clone image ships
-# without bytecode and Ren'Py recompiles on first launch (fine while root is
-# writable; precompile at build time before Phase 5's read-only root).
+# Ren'Py-generated artifacts. The game itself is NOT vendored: it is assembled at
+# build time (stock the_question from the renpy package + the InkyOS hooks and
+# e-ink gui/options overrides under board/qemu/). Only those .rpy deltas are
+# tracked; bytecode and per-run state are derived and recompiled on first launch
+# (fine while root is writable; precompile at build time before Phase 5's
+# read-only root).
 *.rpyc
 *.rpymc
 *.rpyb
@@ -17,3 +18,6 @@
 **/the_question/log.txt
 **/the_question/traceback.txt
 **/the_question/errors.txt
+
+# Python bytecode (scripts/)
+__pycache__/

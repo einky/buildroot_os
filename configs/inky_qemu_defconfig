@@ -46,7 +46,14 @@ BR2_TARGET_ROOTFS_EXT2_SIZE="1G"
 BR2_PACKAGE_HOST_QEMU=y
 BR2_PACKAGE_HOST_QEMU_SYSTEM_MODE=y
 BR2_PACKAGE_RENPY=y
-# Boot-to-game session: Xvfb + supervised Ren'Py, started at boot.
+# einky runtime (ADR 0008): the frame pipeline + input bridge, consumed as a
+# package. Emulator path uses the tcp/socket preview backend and the in-engine
+# input socket, so the hardware-only SPI/GPIO sub-option stays OFF here.
+BR2_PACKAGE_INKY_RUNTIME=y
+# Boot-to-game session: Xvfb + supervised Ren'Py + the runtime receiver/input
+# bridge, started at boot.
 BR2_PACKAGE_INKY_SESSION=y
-# Runtime dep of the device frame-capture path (not a renpy build dep).
+# numpy + Pillow back the runtime frame pipeline; selected by inky-runtime, kept
+# explicit here so a savedefconfig keeps them visible.
+BR2_PACKAGE_PYTHON_NUMPY=y
 BR2_PACKAGE_PYTHON_PILLOW=y
