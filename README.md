@@ -275,10 +275,11 @@ Built in verifiable phases, each gated by a checkpoint.
       `inky-session` package installs a BusyBox-init service (`S95inky-session`) that brings up
       Xvfb and supervises Ren'Py, so a clean boot lands on the_question's main menu with no
       manual launch (verified by capturing the framebuffer post-boot). Buildroot's stock
-      `S40xorg` is removed by `board/qemu/post-build.sh` (the appliance uses Xvfb, not a
+      `S40xorg` is removed by `board/common/post-build.sh` (the appliance uses Xvfb, not a
       VT-bound Xorg). *Remaining:* the GPIO→uinput input bridge — hardware-only, can't be
       exercised on the GPIO-less `virt` machine; on the emulator input is driven over
-      `input_hook.rpy`'s socket via `input_sender.py`.
+      `input_hook.rpy`'s socket via `input_sender.py`. The Pi defconfig now carries the same
+      boot-to-game stack (`board/inky/` + `board/common/`), pending hardware validation.
 - [ ] **Phase 5 — Hardening.** Read-only root + writable data partition for save survival.
 
 ---

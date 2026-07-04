@@ -3,9 +3,20 @@ BR2_ARM_FPU_VFPV4=y
 BR2_TOOLCHAIN_EXTERNAL=y
 BR2_TOOLCHAIN_EXTERNAL_BOOTLIN=y
 BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_AARCH64_GLIBC_STABLE=y
+# Mesa/LLVM (llvmpipe) and Ren'Py's native modules need C++; the Bootlin external
+# toolchain provides libstdc++. ccache keeps the large LLVM/Mesa rebuilds cheap.
+BR2_INSTALL_LIBSTDCPP=y
+BR2_CCACHE=y
 BR2_GLOBAL_PATCH_DIR="board/raspberrypi/patches"
 BR2_DOWNLOAD_FORCE_CHECK_HASHES=y
-BR2_ROOTFS_POST_BUILD_SCRIPT="board/raspberrypizero2w-64/post-build.sh"
+# Rootfs overlay (board/inky/overlay): /etc/default/inky-session selects the
+# hardware backend (EINK_BACKEND=spi, INPUT_MODE=gpio).
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_INKY_PATH)/board/inky/overlay"
+# Post-build chain: the stock rpi script (adds a tty1 getty, handy for bring-up),
+# then the shared InkyOS finalizer (disable stock Xorg + assemble the game). The
+# external one needs $(BR2_EXTERNAL_INKY_PATH); the bare rpi path resolves in
+# Buildroot's own tree.
+BR2_ROOTFS_POST_BUILD_SCRIPT="board/raspberrypizero2w-64/post-build.sh $(BR2_EXTERNAL_INKY_PATH)/board/common/post-build.sh"
 BR2_ROOTFS_POST_IMAGE_SCRIPT="board/raspberrypizero2w-64/post-image.sh"
 BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_TARBALL=y
@@ -15,15 +26,37 @@ BR2_LINUX_KERNEL_DTS_SUPPORT=y
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="broadcom/bcm2710-rpi-zero-2-w"
 BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
 BR2_PACKAGE_BUSYBOX_SHOW_OTHERS=y
-# einky runtime (ADR 0008), hardware target: SPI panel driver + GPIO input.
-# NOTE: inky-runtime depends on BR2_PACKAGE_PYTHON3, which this minimal Pi image
-# does not enable yet (the graphics/Ren'Py/Python stack is still WIP for the Pi
-# -- see README "Project status"). These lines are therefore inert until that
-# stack lands; once python3 + Ren'Py are enabled here they activate the on-device
-# frame pipeline + SPI driver. The emulator (inky_qemu_defconfig) exercises the
-# full path today.
+# einky runtime (ADR 0008), hardware target: the frame pipeline + SPI panel
+# driver + GPIO input bridge. Active now that the python3/graphics/Ren'Py stack
+# below is enabled (inky-runtime depends on BR2_PACKAGE_PYTHON3). _SPI pulls in
+# the C SPI driver (libgpiod) plus the gpiozero/xdotool GPIO input path.
 BR2_PACKAGE_INKY_RUNTIME=y
 BR2_PACKAGE_INKY_RUNTIME_SPI=y
+
+# ── Boot-to-game stack (mirrors inky_qemu_defconfig; proven on the emulator) ──
+# Software desktop GL: Ren'Py needs desktop GL/GLX, which the Pi's VideoCore does
+# NOT expose (GL ES only) -- Mesa llvmpipe gives a real desktop-GL context in
+# software. e-ink refresh is the bottleneck, so CPU rendering costs nothing, and
+# it behaves identically to the emulator. Xvfb is the virtual display Ren'Py
+# renders into; the runtime captures its frames and dispatches them to the panel.
+BR2_PACKAGE_MESA3D_DEMOS=y
+BR2_PACKAGE_MESA3D=y
+BR2_PACKAGE_MESA3D_LLVM=y
+BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LLVMPIPE=y
+BR2_PACKAGE_MESA3D_OPENGL_GLX=y
+BR2_PACKAGE_MESA3D_OPENGL_EGL=y
+BR2_PACKAGE_XORG7=y
+BR2_PACKAGE_XSERVER_XORG_SERVER=y
+BR2_PACKAGE_XSERVER_XORG_SERVER_XVFB=y
+BR2_PACKAGE_PYTHON3=y
+BR2_PACKAGE_RENPY=y
+# Boot-to-game supervisor (S95): Xvfb + runtime receiver/input bridge + supervised
+# Ren'Py. Depends on renpy + inky-runtime + Xvfb (all enabled above).
+BR2_PACKAGE_INKY_SESSION=y
+# numpy + Pillow back the runtime frame pipeline (selected by inky-runtime; kept
+# explicit so a savedefconfig keeps them visible).
+BR2_PACKAGE_PYTHON_NUMPY=y
+BR2_PACKAGE_PYTHON_PILLOW=y
 BR2_PACKAGE_XZ=y
 BR2_PACKAGE_RPI_FIRMWARE=y
 BR2_PACKAGE_RPI_FIRMWARE_BOOTCODE_BIN=y
@@ -37,7 +70,11 @@ BR2_PACKAGE_KMOD=y
 BR2_PACKAGE_KMOD_TOOLS=y
 BR2_TARGET_ROOTFS_EXT2=y
 BR2_TARGET_ROOTFS_EXT2_4=y
-BR2_TARGET_ROOTFS_EXT2_SIZE="120M"
+# Mesa+LLVM (libLLVM ~60-100M) + Xorg + SDL2 + Python3 + Ren'Py + numpy/Pillow
+# overflow the old 120M rootfs; size like the emulator (1G) with headroom. The
+# rpi genimage.cfg.in sizes the SD rootfs partition to this image, so this is the
+# only size knob.
+BR2_TARGET_ROOTFS_EXT2_SIZE="1200M"
 # BR2_TARGET_ROOTFS_TAR is not set
 BR2_PACKAGE_HOST_DOSFSTOOLS=y
 BR2_PACKAGE_HOST_GENIMAGE=y

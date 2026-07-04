@@ -9,9 +9,10 @@ that need them:
     board/inky/config.txt
         Raspberry Pi firmware config: enable SPI, set button GPIO pull-ups.
 
-    board/qemu/overlay/opt/the_question/game/input_hook.rpy
+    board/common/the_question-eink/game/input_hook.rpy
         The in-engine button NAME -> renpy_events map (only the region between
         the GENERATED sentinels is owned by this script; the rest is hand-written).
+        Shared by every target: the board post-build layers it onto the_question.
 
 Usage::
 
@@ -35,7 +36,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-INPUT_HOOK = REPO_ROOT / "board/qemu/overlay/opt/the_question/game/input_hook.rpy"
+INPUT_HOOK = REPO_ROOT / "board/common/the_question-eink/game/input_hook.rpy"
 CONFIG_TXT = REPO_ROOT / "board/inky/config.txt"
 
 _MAP_BEGIN = "# >>> GENERATED button-map"

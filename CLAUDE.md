@@ -126,21 +126,29 @@ What actually exists in the tree:
   `pygame-sdl2` (SDL2 binding / headers), `inky-runtime` (consumes the `runtime` repo — frame
   pipeline + input bridge + optional SPI driver via the `BR2_PACKAGE_INKY_RUNTIME_SPI`
   sub-option), and `inky-session` (the boot-to-game supervisor service).
-- **Emulator board** (`board/qemu/`): `post-build.sh` disables stock Xorg and assembles
-  `/opt/the_question` at build time (stock the_question pulled from the renpy package, with the
-  two InkyOS hooks + the e-ink `gui/options` overrides from `board/qemu/the_question-eink/`
-  layered on). The rootfs overlay carries only the two hooks + `/etc/default/inky-session`; the
-  game is **not** vendored in git.
+- **Shared board files** (`board/common/`): `post-build.sh` (used by *every* target) disables
+  stock Xorg and assembles `/opt/the_question` at build time — stock the_question from the renpy
+  package, then the InkyOS game deltas in `board/common/the_question-eink/game/` (the two hooks
+  `eink_hook.rpy` / `input_hook.rpy` + the e-ink `gui`/`options` overrides) layered on top. The
+  game is **not** vendored in git; both boards assemble an identical game. `input_hook.rpy`'s
+  button map is generated from the contract by `scripts/gen_hardware.py`.
+- **Emulator board** (`board/qemu/`): rootfs overlay carrying `/etc/default/inky-session`
+  (tcp/socket preview + `net_sender` input) + qemu kernel config / post-image.
 - **Hardware board** (`board/inky/`): `config.txt` (generated from the contract: SPI on, button
-  pull-ups) + `overlay/etc/default/inky-session` (spi + gpio). Groundwork — `inky_defconfig`
-  doesn't reference these yet.
-- **Defconfigs**: `inky_qemu_defconfig` (full emulator stack) and `inky_defconfig` (still
-  near-stock Pi Zero 2 W; external Bootlin AArch64 glibc toolchain, custom rpi kernel tarball,
-  `bcm2711` defconfig, DTS `broadcom/bcm2710-rpi-zero-2-w`, ext4 120M). Note the Pi defconfig
-  still references Buildroot's **in-tree** `board/raspberrypizero2w-64/` scripts, not `board/inky/`.
+  pull-ups) + `overlay/etc/default/inky-session` (spi + gpio). Wired into `inky_defconfig`.
+- **Defconfigs**: `inky_qemu_defconfig` (emulator stack) and `inky_defconfig` (Pi Zero 2 W:
+  external Bootlin AArch64 glibc toolchain, custom rpi kernel tarball, `bcm2711` defconfig, DTS
+  `broadcom/bcm2710-rpi-zero-2-w`). The Pi defconfig now carries the same boot-to-game stack as
+  the emulator (Mesa llvmpipe + Xorg/Xvfb + python3 + renpy + inky-session + the SPI/GPIO runtime),
+  points `BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE` + overlay + post-build at `board/inky/` /
+  `board/common/`, and sizes the rootfs to 1.2G. It still uses Buildroot's in-tree
+  `board/raspberrypizero2w-64/` **post-image** (SD-image build) + its post-build (serial getty),
+  chained ahead of `board/common/post-build.sh`.
 
-The remaining gap is the Pi hardware target: bringing its defconfig up to the full
-graphics/Ren'Py/runtime stack and switching it onto `board/inky/`.
+The Pi hardware target is now feature-complete on paper (parity with the emulator + the SPI/GPIO
+backend); what remains is **hardware validation** on a wired board — a full Pi build has not yet
+been booted on real hardware, and the C SPI driver's bring-up flip-points (frame inversion,
+gpiochip index, BUSY polarity) are untested.
 
 ## Phased plan
 
