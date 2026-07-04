@@ -82,6 +82,11 @@ def render_config_txt(c: dict) -> str:
 # Do not edit by hand -- change the contract and run `make` (./br.sh runs the
 # parity check) or `python3 scripts/gen_hardware.py`. CI fails on drift.
 #
+# This is the COMPLETE firmware config.txt for the Pi hardware target; the Pi
+# defconfig points BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE at it. The base boot
+# section mirrors Buildroot's stock board/raspberrypi/config_zero2w_64bit.txt
+# sample; the einky peripheral section below is what the contract adds.
+#
 # Panel: {panel["model"]} ({panel["width"]}x{panel["height"]}, 1-bit).
 # SPI display ([spi], BCM numbering): {spi["dev"]}
 #   MOSI=BCM {spi["mosi"]}  SCLK=BCM {spi["sclk"]}  CS=BCM {spi["cs"]}
@@ -89,6 +94,23 @@ def render_config_txt(c: dict) -> str:
 # Buttons (active-low, internal pull-up):
 {btn_lines}
 
+# ── Base Pi Zero 2 W boot (firmware essentials; do not drop these) ────────────
+start_file=start.elf
+fixup_file=fixup.dat
+kernel=Image
+# Assume the display shows the full resolution (no overscan borders).
+disable_overscan=1
+# GPU memory split (MB) by total RAM. llvmpipe renders in software, so the GPU
+# needs little; kept at the stock value to preserve boot behaviour.
+gpu_mem_256=100
+gpu_mem_512=100
+gpu_mem_1024=100
+# Free the PL011 (ttyAMA0) for the serial console, mini-UART -> Bluetooth.
+dtoverlay=miniuart-bt
+# 64-bit kernel (matches the aarch64 toolchain / bcm2711 defconfig).
+arm_64bit=1
+
+# ── einky peripherals (from the hardware contract) ───────────────────────────
 # Hardware SPI0 (MOSI/SCLK/CE0 on their fixed ALT0 pins) for the panel.
 dtparam=spi=on
 

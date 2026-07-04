@@ -28,7 +28,11 @@ BR2_PACKAGE_XZ=y
 BR2_PACKAGE_RPI_FIRMWARE=y
 BR2_PACKAGE_RPI_FIRMWARE_BOOTCODE_BIN=y
 BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI=y
-BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="board/raspberrypizero2w-64/config_zero2w_64bit.txt"
+# InkyOS firmware config.txt (generated from the hardware contract by
+# scripts/gen_hardware.py): base Pi boot + SPI panel bus on + button pull-ups.
+# Absolute path via $(BR2_EXTERNAL_INKY_PATH): a bare "board/inky/..." would
+# resolve against Buildroot's own tree, not this external tree.
+BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_INKY_PATH)/board/inky/config.txt"
 BR2_PACKAGE_KMOD=y
 BR2_PACKAGE_KMOD_TOOLS=y
 BR2_TARGET_ROOTFS_EXT2=y
