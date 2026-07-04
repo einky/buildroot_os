@@ -45,7 +45,10 @@ INKY_RUNTIME_DEPENDENCIES = \
 ifeq ($(BR2_PACKAGE_INKY_RUNTIME_SPI),y)
 # host-python-cffi: build.py uses `from cffi import FFI` on the HOST python.
 # python-cffi: the compiled _spi_driver imports _cffi_backend on the target.
-INKY_RUNTIME_DEPENDENCIES += host-python-cffi python-cffi
+# libgpiod: the C driver links -lgpiod for the DC/RST/BUSY control lines; its
+# staging headers + lib are what the cross CFFI build compiles/links against
+# (found via the cross-compiler sysroot, same as package/renpy's native libs).
+INKY_RUNTIME_DEPENDENCIES += host-python-cffi python-cffi libgpiod
 
 # Cross-compile env for runtime's CFFI SPI extension, mirroring package/renpy:
 # the host python emits an aarch64 object because _PYTHON_SYSCONFIGDATA_NAME

@@ -28,6 +28,7 @@ if BR2_PACKAGE_INKY_RUNTIME
 config BR2_PACKAGE_INKY_RUNTIME_SPI
 	bool "on-device SPI panel + GPIO input (hardware target)"
 	select BR2_PACKAGE_PYTHON_CFFI      # _spi_driver runtime import
+	select BR2_PACKAGE_LIBGPIOD         # _spi_driver links -lgpiod (DC/RST/BUSY)
 	select BR2_PACKAGE_PYTHON_GPIOZERO  # input.handler GPIO reader
 	select BR2_PACKAGE_PYTHON_RPI_GPIO  # gpiozero pin factory on the Pi
 	select BR2_PACKAGE_XDOTOOL          # input.handler keysym injection
