@@ -1,15 +1,27 @@
 # InkyOS session configuration -- QEMU emulator target.
-# Sourced by /usr/bin/inky-session. See package/inky-session/inky-session.sh.
+# Sourced by /usr/bin/inky-session; read by the launcher. See
+# package/inky-session/inky-session.sh.
 
-# Frame pipeline: preview over TCP. TcpFrameSink binds the port and drops frames
-# while no client is attached, so the receiver never blocks on a headless box. A
-# host preview tool can attach via a QEMU port-forward to EINK_TCP_PORT.
-EINK_BACKEND=tcp
-EINK_TCP_HOST=0.0.0.0
-EINK_TCP_PORT=5333
+# Display: stream 1-bit frames over TCP. The launcher's TcpBackend binds the port
+# and drops frames while no client is attached, so it never blocks on a headless
+# box. A host preview tool attaches via the run-qemu port-forward.
+export EINKY_DISPLAY_BACKEND=tcp
+export EINKY_FRAME_TCP_HOST=0.0.0.0
+export EINKY_FRAME_TCP_PORT=5333
 
-# Input: in-engine socket path. Write button NAMES (one per line, from
-# meta/shared/hardware.toml: up/down/left/right/a/b/start) into INPUT_FIFO and
-# runtime's net_sender forwards them to input_hook.rpy, which queues the events.
-INPUT_MODE=net_sender
-INPUT_FIFO=/run/inky-input
+# Input: accept ascii button NAMES (up/down/left/right/a/b/start, one per line)
+# over TCP. The launcher's TcpSource binds this port; a host sender attaches via
+# the run-qemu port-forward.
+export EINKY_INPUT_SOURCE=tcp
+export EINKY_INPUT_TCP_HOST=0.0.0.0
+export EINKY_INPUT_TCP_PORT=5334
+
+# Where games are scanned and where settings / cover cache persist.
+export EINKY_GAMES_DIR=/opt/games
+export EINKY_STATE_DIR=/var/lib/inky
+
+# This is a real device (the VM): allow the Power menu to halt/reboot it.
+export EINKY_ALLOW_POWER=1
+
+# No wlan0 in the emulator; use fake networks so the Wi-Fi UI is exercisable.
+export EINKY_WIFI_BACKEND=mock

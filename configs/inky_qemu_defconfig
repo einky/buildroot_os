@@ -51,8 +51,12 @@ BR2_PACKAGE_RENPY=y
 # package. Emulator path uses the tcp/socket preview backend and the in-engine
 # input socket, so the hardware-only SPI/GPIO sub-option stays OFF here.
 BR2_PACKAGE_INKY_RUNTIME=y
-# Boot-to-game session: Xvfb + supervised Ren'Py + the runtime receiver/input
-# bridge, started at boot.
+# The first-boot launcher / dashboard (ADR 0009): the game library + settings UI
+# the appliance boots into. Renders 1-bit frames with Pillow via the runtime
+# panel/dispatch; on the emulator it uses the tcp preview + tcp input sources.
+BR2_PACKAGE_INKY_LAUNCHER=y
+# Boot session: supervises the launcher (which owns the panel + buttons and
+# spawns Ren'Py games itself), started at boot.
 BR2_PACKAGE_INKY_SESSION=y
 # numpy + Pillow back the runtime frame pipeline; selected by inky-runtime, kept
 # explicit here so a savedefconfig keeps them visible.

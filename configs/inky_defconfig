@@ -53,8 +53,12 @@ BR2_PACKAGE_XSERVER_XORG_SERVER=y
 BR2_PACKAGE_XSERVER_XORG_SERVER_XVFB=y
 BR2_PACKAGE_PYTHON3=y
 BR2_PACKAGE_RENPY=y
-# Boot-to-game supervisor (S95): Xvfb + runtime receiver/input bridge + supervised
-# Ren'Py. Depends on renpy + inky-runtime + Xvfb (all enabled above).
+# The first-boot launcher / dashboard (ADR 0009): game library + settings UI. On
+# hardware it drives the panel over SPI and reads the GPIO buttons directly (via
+# inky-runtime's SPI driver + keymap), and spawns Ren'Py games as children.
+BR2_PACKAGE_INKY_LAUNCHER=y
+# Boot supervisor (S95): supervises the launcher (which owns the panel + buttons
+# and spawns Ren'Py games itself). Depends on renpy + inky-runtime + Xvfb.
 BR2_PACKAGE_INKY_SESSION=y
 # numpy + Pillow back the runtime frame pipeline (selected by inky-runtime; kept
 # explicit so a savedefconfig keeps them visible).
@@ -71,6 +75,17 @@ BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI=y
 BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_INKY_PATH)/board/inky/config.txt"
 BR2_PACKAGE_KMOD=y
 BR2_PACKAGE_KMOD_TOOLS=y
+# ── Wi-Fi (launcher Settings > Wi-Fi, WpaCliBackend) ─────────────────────────
+# The Pi Zero 2 W's BCM43436 needs the Raspberry Pi brcmfmac firmware+nvram; the
+# in-tree bcm2711 kernel already builds the brcmfmac driver. wpa_supplicant +
+# _CLI give the `wpa_cli` the launcher drives; udhcpc (busybox) gets the lease.
+# NOTE: enabled here for the hardware target but only build/HW-verified at M5 --
+# the boot-time wpa_supplicant service + regulatory domain are finalised then.
+BR2_PACKAGE_LINUX_FIRMWARE=y
+BR2_PACKAGE_LINUX_FIRMWARE_RPIDISTRO_BCM43XXX=y
+BR2_PACKAGE_WPA_SUPPLICANT=y
+BR2_PACKAGE_WPA_SUPPLICANT_CLI=y
+BR2_PACKAGE_WPA_SUPPLICANT_NL80211=y
 BR2_TARGET_ROOTFS_EXT2=y
 BR2_TARGET_ROOTFS_EXT2_4=y
 # Mesa+LLVM (libLLVM ~60-100M) + Xorg + SDL2 + Python3 + Ren'Py + numpy/Pillow

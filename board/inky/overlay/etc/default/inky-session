@@ -1,15 +1,21 @@
 # InkyOS session configuration -- Raspberry Pi hardware target.
-# Sourced by /usr/bin/inky-session. See package/inky-session/inky-session.sh.
-#
-# Groundwork for the hardware boot-to-game path: this overlay activates once the
-# Pi defconfig grows the python3/Ren'Py/Xvfb stack (README "Project status").
+# Sourced by /usr/bin/inky-session; read by the launcher. See
+# package/inky-session/inky-session.sh.
 
-# Frame pipeline: push to the GDEM0397T81P over SPI via runtime's C driver.
-EINK_BACKEND=spi
-EINK_SPI_DEV=/dev/spidev0.0
+# Display: push 1-bit frames to the GDEM0397T81P over SPI via runtime's C driver.
+export EINKY_DISPLAY_BACKEND=spi
+export EINKY_SPI_DEV=/dev/spidev0.0
 
-# Input: GPIO buttons -> runtime input handler (gpiozero) -> xdotool keysyms.
-INPUT_MODE=gpio
+# Input: read the 7 GPIO buttons directly (gpiozero via libgpiod). The launcher
+# owns the buttons itself -- no xdotool / Xvfb injection for its own UI.
+export EINKY_INPUT_SOURCE=gpio
 # gpiozero pin factory: RPi.GPIO (python-rpi-gpio); lgpio is not packaged in
-# Buildroot. Must be exported so the inky-input child process sees it.
+# Buildroot. Exported so the launcher process sees it.
 export GPIOZERO_PIN_FACTORY=rpigpio
+
+# Where games are scanned and where settings / cover cache persist.
+export EINKY_GAMES_DIR=/opt/games
+export EINKY_STATE_DIR=/var/lib/inky
+
+# Real hardware: allow the Power menu to halt/reboot the device.
+export EINKY_ALLOW_POWER=1

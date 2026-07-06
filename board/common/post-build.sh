@@ -8,13 +8,15 @@
 #    unwanted and would contend for :0 / spew errors on a box with no real
 #    display device. (rm -f is a no-op if the target has no S40xorg.)
 #
-# 2. Assemble /opt/the_question from the *stock* the_question that ships in the
-#    renpy source tarball (built by the renpy package), then layer the InkyOS
+# 2. Assemble /opt/games/the_question from the *stock* the_question that ships in
+#    the renpy source tarball (built by the renpy package), then layer the InkyOS
 #    game deltas on top: the two in-engine hooks (eink_hook.rpy / input_hook.rpy,
 #    the latter generated from the hardware contract) plus the e-ink gui/options
 #    overrides. All four live in board/common/the_question-eink/game/ so both the
 #    emulator and the Pi assemble an identical game -- we do NOT vendor a second
-#    copy of the game in git.
+#    copy of the game in git. Games live under /opt/games/<slug>/ so the launcher
+#    can scan them (EINKY_GAMES_DIR=/opt/games); the two hooks are what every game
+#    needs to feed frames/input to/from the launcher (ADR 0008/0009).
 #
 # Buildroot passes TARGET_DIR as $1 and exports BASE_DIR (and friends) into the
 # environment; further args from BR2_ROOTFS_POST_SCRIPT_ARGS are ignored here.
@@ -27,7 +29,7 @@ BUILD_DIR="${BUILD_DIR:-$BASE_DIR/build}"
 rm -f "$TARGET_DIR/etc/init.d/S40xorg"
 
 # --- assemble the game --------------------------------------------------------
-GAME_DST="$TARGET_DIR/opt/the_question"
+GAME_DST="$TARGET_DIR/opt/games/the_question"
 
 # Stock the_question from the renpy source tree (renpy is built before finalize).
 GAME_SRC="$(ls -d "$BUILD_DIR"/renpy-*/the_question 2>/dev/null | head -1)"
@@ -41,5 +43,13 @@ fi
 mkdir -p "$GAME_DST"
 cp -a "$GAME_SRC/." "$GAME_DST/"
 cp -a "$HERE/the_question-eink/game/." "$GAME_DST/game/"
+
+# Presentation metadata for the launcher library (title/author). Optional --
+# a bare game dir still shows up with its dirname as the title.
+cat > "$GAME_DST/inky-manifest.toml" <<'EOF'
+title = "The Question"
+author = "Tom Rothamel"
+sort_key = "010"
+EOF
 
 echo "post-build: assembled $GAME_DST from $GAME_SRC + InkyOS hooks/overrides"
