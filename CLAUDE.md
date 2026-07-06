@@ -112,7 +112,13 @@ InkyOS builds it as the `package/inky-runtime` Buildroot package and runs its co
 (`inky-eink-receiver`, `inky-input`, `inky-frame`). The panel geometry, GPIO/SPI pins, button
 bindings, and wire-protocol constants come from `../meta/shared/hardware.toml`; version pins
 from `../meta/versions.env`. Do **not** hand-edit `board/inky/config.txt` or the `input_hook.rpy`
-button map — regenerate them with `scripts/gen_hardware.py`.
+button map — regenerate them with `scripts/gen_hardware.py`. **The build never reads the
+contract:** it bakes in the committed generated files, so a contract edit reaches the image only
+after you regenerate. And regenerating buildroot_os is **not sufficient** — the pins the panel
+driver and input daemon actually use live in `runtime` (`src/spi_driver/contract.h`,
+`src/input/keymap.py`); `config.txt` only enables the SPI bus and sets boot-time button pull-ups.
+Changing a pin means: edit the contract → `scripts/gen_hardware.py` **and** `runtime`'s `make gen`
+→ rebuild. `br.sh`'s `gen_hardware.py --check` guards buildroot_os's files only, not runtime's.
 
 Ren'Py and `pygame_sdl2` are built from source as Buildroot packages under `package/renpy/` and
 `package/pygame-sdl2/` (Ren'Py 8.5.2 vendors its own pygame, so `pygame-sdl2` provides only the

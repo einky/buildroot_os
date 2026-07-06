@@ -241,6 +241,33 @@ sudo dd if=output/images/sdcard.img of=/dev/sdX bs=4M conv=fsync
 
 Use a USB-TTL serial adapter on the Pi's UART pins for the boot console.
 
+### Changing a hardware pin
+
+`meta/shared/hardware.toml` is the single source of truth for pins, **but the build
+does not read it.** The image bakes in *committed, pre-generated* files; the contract is
+only their upstream source, wired up by a manual `gen` step you must run in **each**
+consumer repo. Editing `hardware.toml` alone changes nothing in the image.
+
+To actually move a signal:
+
+1. Edit `../meta/shared/hardware.toml`.
+2. Regenerate in **both** repos — neither is optional:
+   - `python3 scripts/gen_hardware.py` → `board/inky/config.txt` (SPI bus on + button
+     boot-time pull-ups) and `board/common/…/input_hook.rpy` (in-engine button map).
+   - `cd ../runtime && make gen` → `src/spi_driver/contract.h` (the DC/RST/BUSY/CS pins
+     the panel driver actually toggles) and `src/input/keymap.py` (the button GPIOs the
+     input daemon reads). **`config.txt` does not set these** — regenerating buildroot_os
+     alone leaves the panel/button logic on the old pins.
+3. `./build.sh pi`, then re-flash.
+
+`./br.sh` runs `gen_hardware.py --check` before each build and fails on drift — but only
+for **buildroot_os's own** files, not `runtime`'s (that's `runtime`'s own `make gen-check`),
+and it skips entirely if `../meta` is absent. Full walkthrough + the fixed-SPI0-pins caveat:
+`docs/docs/hardware/wiring.md` → *Changing a pin* (published at `docs.einky.fr`).
+
+Note: hardware SPI0 (`mosi`/`sclk`/`cs`) is fixed to the Pi's ALT0 pins — changing those
+numbers in the contract only relabels docs, it does not rewire SPI0.
+
 ---
 
 ## Environment variables
