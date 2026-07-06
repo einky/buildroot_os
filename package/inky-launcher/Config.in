@@ -1,0 +1,28 @@
+config BR2_PACKAGE_INKY_LAUNCHER
+	bool "inky-launcher"
+	depends on BR2_PACKAGE_PYTHON3
+	depends on BR2_PACKAGE_INKY_RUNTIME
+	select BR2_PACKAGE_PYTHON_PILLOW  # 1-bit frame compositing
+	select BR2_PACKAGE_DEJAVU         # scalable UI font (else Pillow's default)
+	help
+	  The einky first-boot launcher / dashboard: the game library and
+	  system settings UI that IS the appliance's front end. A pure-
+	  Python app that renders 1-bit frames with Pillow and pushes them
+	  through the shared `runtime` panel driver, reads the 7 GPIO
+	  buttons via the runtime keymap, and spawns Ren'Py games as
+	  supervised child processes.
+
+	  It owns the panel (SPI) and buttons (GPIO) for the whole uptime;
+	  games only push PNG frames and receive button names over the
+	  engine-capture sockets. Consumes `inky-runtime` for the frame
+	  dispatch, keymap, and SPI driver -- it does not reimplement any
+	  of that (ADR 0008 / 0009).
+
+	  The package is sourced from the launcher repo (pinned commit;
+	  override with INKY_LAUNCHER_OVERRIDE_SRCDIR for a local checkout
+	  -- ./br.sh wires this automatically when ../launcher exists).
+
+	  https://github.com/einky/launcher
+
+comment "inky-launcher needs python3 + inky-runtime"
+	depends on !BR2_PACKAGE_PYTHON3 || !BR2_PACKAGE_INKY_RUNTIME

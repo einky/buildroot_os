@@ -41,11 +41,17 @@ TTY_FLAGS=(-i)
 # OVERRIDE_SRCDIR, so the private repo needs no network/credentials. Without the
 # sibling, inky-runtime falls back to its pinned git source.
 RUNTIME_SRC="$(cd "$REPO/.." && pwd)/runtime"
+LAUNCHER_SRC="$(cd "$REPO/.." && pwd)/launcher"
 RUNTIME_MOUNT=()
 MAKE_OVERRIDE=()
 if [ -d "$RUNTIME_SRC" ]; then
   RUNTIME_MOUNT=(-v "$RUNTIME_SRC":/runtime:ro)
   MAKE_OVERRIDE=(INKY_RUNTIME_OVERRIDE_SRCDIR=/runtime)
+fi
+# Same OVERRIDE_SRCDIR trick for the sibling `launcher` checkout (ADR 0009).
+if [ -d "$LAUNCHER_SRC" ]; then
+  RUNTIME_MOUNT+=(-v "$LAUNCHER_SRC":/launcher:ro)
+  MAKE_OVERRIDE+=(INKY_LAUNCHER_OVERRIDE_SRCDIR=/launcher)
 fi
 
 DOCKER_RUN=(docker run --rm "${TTY_FLAGS[@]}"

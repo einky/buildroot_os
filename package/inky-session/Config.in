@@ -4,21 +4,26 @@ config BR2_PACKAGE_INKY_SESSION
 	depends on BR2_PACKAGE_INKY_RUNTIME
 	depends on BR2_PACKAGE_XSERVER_XORG_SERVER_XVFB
 	help
-	  InkyOS boot-to-game session. Installs a BusyBox-init service
-	  (S95inky-session) that starts the Xvfb virtual display, the
-	  einky runtime consumers (inky-eink-receiver for the e-ink frame
-	  pipeline + the input bridge), and supervises the Ren'Py game
-	  under /opt/the_question, restarting it on exit -- so the device
-	  boots straight into the game and never drops to a shell.
+	  InkyOS boot session. Installs a BusyBox-init service
+	  (S95inky-session) that supervises the inky-launcher process --
+	  restarting it on exit -- so the device boots straight into the
+	  launcher UI and never drops to a shell.
 
-	  This is what wires the in-engine eink_hook.rpy / input_hook.rpy
-	  to the runtime package (ADR 0008). Per-target behaviour (SPI vs
-	  emulator preview, GPIO vs in-engine input) is selected by
-	  /etc/default/inky-session, shipped from the board overlay.
+	  The launcher (not this service) owns the e-ink panel and the
+	  buttons for the whole uptime and spawns Ren'Py games itself,
+	  bringing up Xvfb on demand and wiring the in-engine
+	  eink_hook.rpy / input_hook.rpy to the runtime frame/dither +
+	  input path over the engine-capture sockets (ADR 0008/0009).
 
-	  The game itself is assembled at build time (stock the_question
-	  pulled from the renpy package + the InkyOS hooks layered on top
-	  by the board post-build script), not vendored in git.
+	  Per-target behaviour (SPI panel vs emulator TCP preview, GPIO
+	  buttons vs TCP input) is selected by /etc/default/inky-session,
+	  shipped from the board overlay, which exports the EINKY_*
+	  backend selectors the launcher reads.
+
+	  Games are assembled at build time under /opt/games/<slug>/
+	  (stock the_question from the renpy package + the InkyOS hooks
+	  layered on top by the board post-build script), not vendored in
+	  git.
 
 comment "inky-session needs renpy + inky-runtime + Xvfb"
 	depends on !BR2_PACKAGE_RENPY || !BR2_PACKAGE_INKY_RUNTIME \
