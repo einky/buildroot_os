@@ -206,15 +206,43 @@ Notes:
 
 ### Emulator target (recommended for development)
 
-Boot the emulator image on the host with the provided wrapper, which auto-detects the kernel
-and rootfs under `output-qemu/images/`:
+**See and drive the UI on your laptop — one command:**
 
 ```bash
-./run-qemu.sh
+./run-emulator.sh          # boots QEMU *and* opens the e-ink preview window
 ```
 
-It runs the exact verified command for the `virt` machine — a single muxed serial console to
-your terminal, no graphics:
+This boots the image and opens a Tk window that is the stand-in for the e-ink panel, plus a
+gamepad in the same window: **arrows / wasd** move, **j** = A, **k** = B, **Enter** = Start,
+**h** = hold-Start (the exit-a-game combo). The terminal remains the guest serial console
+(login: `root`, no password); quit everything with **Ctrl-A** then **X**.
+
+> **Why a window and not `-vga`/`-display gtk`?** The device has no VGA/GPU screen — the UI is
+> an **800×480 1-bit e-ink panel** driven over SPI. QEMU's `virt` machine has no such panel, so
+> a VGA display would show nothing. Instead the launcher auto-starts at boot with
+> `EINKY_DISPLAY_BACKEND=tcp` and streams frames over guest TCP **:5333** (input on **:5334**);
+> `run-qemu.sh` forwards both to `localhost`, and `run-emulator.sh` points the preview client
+> (`launcher/tools/dev_preview.py`, Tk + Pillow) at them. The window may stay blank for a few
+> seconds until the guest launcher comes up (`--wait` retries), and it reconnects when the
+> launcher restarts after a game exits.
+
+Preview prerequisites (host, once): python3 **tkinter** + **Pillow**.
+
+```bash
+# Arch      : sudo pacman -S --needed tk python-pillow
+# Debian/Ubuntu: sudo apt install python3-tk python3-pil.imagetk
+# Fedora    : sudo dnf install python3-tkinter python3-pillow-tk
+```
+
+**Headless boot (no window):** the underlying wrapper auto-detects the kernel and rootfs under
+`output-qemu/images/` and boots a single muxed serial console, no graphics:
+
+```bash
+./run-qemu.sh              # or:  NO_PREVIEW=1 ./run-emulator.sh
+```
+
+It runs the exact verified command for the `virt` machine (the `hostfwd` rules expose the
+launcher's frame/input ports so a preview client can attach):
 
 ```bash
 qemu-system-aarch64 -M virt -cpu cortex-a53 -m 512 -smp 4 \
@@ -222,11 +250,18 @@ qemu-system-aarch64 -M virt -cpu cortex-a53 -m 512 -smp 4 \
   -append "rootwait root=/dev/vda console=ttyAMA0" \
   -drive file=output-qemu/images/rootfs.ext4,if=none,format=raw,id=hd0 \
   -device virtio-blk-device,drive=hd0 \
-  -netdev user,id=eth0 -device virtio-net-device,netdev=eth0 \
+  -netdev user,id=eth0,hostfwd=tcp::5333-:5333,hostfwd=tcp::5334-:5334 \
+  -device virtio-net-device,netdev=eth0 \
   -serial mon:stdio -display none
 ```
 
-Log in as `root` (no password). Exit QEMU with **Ctrl-A** then **X**.
+Log in as `root` (no password). Exit QEMU with **Ctrl-A** then **X**. To attach the preview and
+input tools to a running `./run-qemu.sh` by hand:
+
+```bash
+python3 ../launcher/tools/dev_preview.py --wait --scale 2 --input-port 5334   # screen + gamepad
+python3 ../launcher/tools/send_input.py --port 5334                           # or a separate input sender
+```
 
 > Buildroot's `start-qemu.sh` is **not** generated here: its post-image step only emits that
 > script when the defconfig name matches a `# <name>` tag in Buildroot's `readme.txt`, and our
