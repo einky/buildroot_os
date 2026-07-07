@@ -6,13 +6,11 @@
 # BusyBox appliance with no udev/mdev and nothing that runs modprobe, so a =m
 # driver never loads and its device node never appears -- on first hardware
 # bring-up the panel stayed dark because /dev/spidev0.0 didn't exist. Build
-# the panel and input paths into the kernel instead.
+# the panel bus into the kernel instead. (The buttons and the panel's
+# DC/RST/BUSY lines go through the gpiochip character device, which the
+# defconfig already builds in: CONFIG_GPIO_CDEV=y.)
 
 # SPI0 controller + spidev char device: /dev/spidev0.0, the e-ink panel bus
 # (enabled in config.txt with dtparam=spi=on).
 CONFIG_SPI_BCM2835=y
 CONFIG_SPI_SPIDEV=y
-
-# /dev/gpiomem: RPi.GPIO (gpiozero's rpigpio pin factory, the button path)
-# mmaps the GPIO block through it rather than /dev/mem.
-CONFIG_RASPBERRYPI_GPIOMEM=y

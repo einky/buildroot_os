@@ -27,19 +27,20 @@ if BR2_PACKAGE_INKY_RUNTIME
 
 config BR2_PACKAGE_INKY_RUNTIME_SPI
 	bool "on-device SPI panel + GPIO input (hardware target)"
+	# python-gpiod needs kernel headers >= 5.10; repeat its dependency here so
+	# the select below can never fire with unmet deps (kconfig silently drops
+	# the selected symbol's own selects in that case -- the colorzero trap).
+	depends on BR2_TOOLCHAIN_HEADERS_AT_LEAST_5_10
 	select BR2_PACKAGE_PYTHON_CFFI      # _spi_driver runtime import
-	select BR2_PACKAGE_LIBGPIOD         # _spi_driver links -lgpiod (DC/RST/BUSY)
-	select BR2_PACKAGE_PYTHON_GPIOZERO  # input.handler GPIO reader
-	# gpiozero imports colorzero at package init. Buildroot's python-gpiozero
-	# does `select BR2_PACKAGE_PYTHON_COLORZERO`, but kconfig drops selects
-	# made by a symbol whose own dependencies are unmet -- and python-gpiozero
-	# `depends on BR2_arm` (32-bit only; stale upstream restriction, the
-	# package is pure Python), which is false on our aarch64 target. So the
-	# select above force-enables gpiozero (with an "unmet direct dependencies"
-	# warning) while its colorzero select silently vanishes. Select the
-	# runtime dep explicitly.
-	select BR2_PACKAGE_PYTHON_COLORZERO
-	select BR2_PACKAGE_PYTHON_RPI_GPIO  # gpiozero pin factory on the Pi
+	select BR2_PACKAGE_LIBGPIOD2        # _spi_driver links -lgpiod (v2 API, DC/RST/BUSY)
+	# Buttons are read from the gpiochip character device (input.gpio_reader).
+	# gpiozero/RPi.GPIO is unusable on kernels >= 6.6: RPi.GPIO does edge
+	# detection through the legacy /sys/class/gpio interface with raw BCM
+	# numbers, which fail once the gpiochip sits at a dynamic global base
+	# ("export_store: invalid GPIO 5" on first hardware bring-up). python-gpiod
+	# conflicts with libgpiod v1, hence LIBGPIOD2 above.
+	select BR2_PACKAGE_PYTHON_GPIOD     # input.gpio_reader button events
+	select BR2_PACKAGE_LIBGPIOD2_TOOLS  # gpioinfo/gpioget/gpioset for bring-up
 	select BR2_PACKAGE_XDOTOOL          # input.handler keysym injection
 	help
 	  Cross-compile the GDEM0397T81P SPI driver C extension

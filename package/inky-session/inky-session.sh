@@ -26,7 +26,7 @@ export SDL_AUDIODRIVER=dummy
 export RENPY_EINK_SOCKET=/tmp/renpy-eink.sock
 export RENPY_INPUT_SOCKET=/tmp/renpy-input.sock
 
-# Per-target backend selection (exports EINKY_* / GPIOZERO_PIN_FACTORY).
+# Per-target backend selection (exports the EINKY_* variables).
 [ -r /etc/default/inky-session ] && . /etc/default/inky-session
 
 LOGDIR=/var/log

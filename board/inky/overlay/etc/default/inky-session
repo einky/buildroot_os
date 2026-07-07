@@ -6,12 +6,13 @@
 export EINKY_DISPLAY_BACKEND=spi
 export EINKY_SPI_DEV=/dev/spidev0.0
 
-# Input: read the 7 GPIO buttons directly (gpiozero via libgpiod). The launcher
-# owns the buttons itself -- no xdotool / Xvfb injection for its own UI.
+# Input: read the 7 GPIO buttons directly (python-gpiod on the gpiochip
+# character device). The launcher owns the buttons itself -- no xdotool / Xvfb
+# injection for its own UI.
 export EINKY_INPUT_SOURCE=gpio
-# gpiozero pin factory: RPi.GPIO (python-rpi-gpio); lgpio is not packaged in
-# Buildroot. Exported so the launcher process sees it.
-export GPIOZERO_PIN_FACTORY=rpigpio
+# GPIO chip that owns the BCM lines (buttons and the panel's DC/RST/BUSY both
+# use it). gpiochip0 is the SoC bank on the Pi Zero 2 W vendor kernel.
+export EINKY_GPIOCHIP=/dev/gpiochip0
 
 # Where games are scanned and where settings / cover cache persist.
 export EINKY_GAMES_DIR=/opt/games
