@@ -32,5 +32,12 @@ export EINKY_GPIOCHIP=/dev/gpiochip0
 export EINKY_GAMES_DIR=/opt/games
 export EINKY_STATE_DIR=/var/lib/inky
 
+# Boot this game invisibly in the background so pressing Play adopts the
+# already-running process instead of paying Ren'Py's cold start (~tens of
+# seconds on the Zero 2 W). Re-warmed after each game exit. Costs idle RAM
+# (~200 MB) while in the menu -- fine with the zram backstop and a single
+# bundled game; unset to reclaim it.
+export EINKY_PREWARM_GAME=the_question
+
 # Real hardware: allow the Power menu to halt/reboot the device.
 export EINKY_ALLOW_POWER=1
