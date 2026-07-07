@@ -1,11 +1,12 @@
 # InkyOS
 
 A custom embedded Linux image, built with **Buildroot**, that boots a **Raspberry Pi
-Zero 2 W** directly into a single Ren'Py visual-novel game. InkyOS is the operating-system
-component of the Einky e-ink handheld console (Crab-Ink-Gaming).
+Zero 2 W** directly into the **einky launcher** — the native Python game library /
+settings dashboard (ADR 0009) that spawns Ren'Py visual-novel games on demand. InkyOS is
+the operating-system component of the Einky e-ink handheld console (Crab-Ink-Gaming).
 
 The image is a **fixed appliance**: no runtime package manager, a reproducible build, and a
-boot path that goes straight to the game with no shell or desktop in between.
+boot path that goes straight to the launcher with no shell or desktop in between.
 
 ---
 
@@ -26,14 +27,16 @@ sidesteps that failure entirely, and behaves **identically in QEMU and on hardwa
 it never depends on a GPU. The e-ink refresh is the real performance bottleneck, so software
 rendering costs us nothing in practice.
 
-**Display = frame capture, not a screen.** Ren'Py renders into a virtual framebuffer
-(Xvfb); a capture step reads pixels, applies Floyd–Steinberg dithering to 1-bit, and pushes
-frames to the e-ink panel over SPI via a small C driver.
+**Display = frames pushed to the launcher, not a screen.** The launcher renders its own
+1-bit menu frames (Pillow) and drives the panel over SPI via `runtime`'s small C driver.
+A running Ren'Py game renders into a virtual framebuffer (Xvfb) and ships one PNG per
+stable frame over a Unix socket (the one-patch `config.eink_push_callback` hook); the
+launcher applies Floyd–Steinberg dithering to 1-bit and pushes it to the panel.
 
-**Input = GPIO → uinput → SDL2.** A daemon reads the hardware buttons via `libgpiod`
-(`/dev/gpiochip0`, the modern character-device API) and injects them through the kernel
-`uinput` device as a virtual keyboard. SDL2 — and therefore Ren'Py — sees ordinary key
-events with no engine modifications.
+**Input = GPIO → launcher → engine socket.** The launcher owns the seven buttons
+(gpiozero, from the contract keymap) and, while a game runs, forwards button *names* over
+a Unix socket to the game's `input_hook.rpy`, which queues the mapped Ren'Py events. No
+X-level key injection, no uinput, no engine input modifications.
 
 **Two build targets.** See [Build targets](#build-targets). One image for real hardware,
 one for fast, reliable emulation.
@@ -59,14 +62,18 @@ buildroot_os/
 ├── configs/
 │   ├── inky_defconfig         # HARDWARE target (Pi Zero 2 W)
 │   └── inky_qemu_defconfig    # EMULATOR target (QEMU virt)   [see Build targets]
-├── board/inky/
-│   ├── config.txt            # Pi firmware config (SPI, 64-bit) — added in build phases
-│   ├── linux.fragment        # extra kernel options (uinput, evdev, spi)
-│   ├── genimage.cfg          # SD image partition layout
-│   └── rootfs-overlay/       # files copied verbatim into the rootfs
+├── board/
+│   ├── common/               # shared by all targets: post-build.sh (drop stock Xorg,
+│   │                         #   assemble /opt/games/the_question + hooks) 
+│   ├── inky/                 # Pi target: config.txt (generated from the contract),
+│   │                         #   overlay/etc/default/inky-session (spi/gpio), sync-config-txt.sh
+│   └── qemu/                 # emulator target: overlay (tcp/tcp backends), kernel config
 ├── package/
-│   ├── pygame-sdl2/          # Buildroot recipe for pygame_sdl2 (Ren'Py dependency)
-│   └── renpy/                # Buildroot recipe for the Ren'Py engine
+│   ├── renpy/                # Ren'Py engine from source (+ the one e-ink patch)
+│   ├── pygame-sdl2/          # packaged but unused (8.5.2 vendors renpy.pygame)
+│   ├── inky-runtime/         # the runtime repo as a package (pipeline + SPI driver)
+│   ├── inky-launcher/        # the launcher repo as a package (boot UI, ADR 0009)
+│   └── inky-session/         # boot service: S95 + the launcher supervisor
 ├── .dl/                      # download cache (gitignored, persists across builds)
 ├── .ccache/                  # compiler cache (gitignored)
 ├── output/                   # HARDWARE build output (gitignored)
@@ -333,15 +340,14 @@ Built in verifiable phases, each gated by a checkpoint.
       `./br.sh make renpy-rebuild` recompiles the engine. (`pygame-sdl2` is packaged but
       unused — 8.5.2 vendors its own `renpy.pygame`; see Pinned versions.) Verified by
       capturing the Xvfb framebuffer; see the captured frame in the session notes.
-- [~] **Phase 4 — Boot-to-game + input.** *Session launcher done* (emulator): the
-      `inky-session` package installs a BusyBox-init service (`S95inky-session`) that brings up
-      Xvfb and supervises Ren'Py, so a clean boot lands on the_question's main menu with no
-      manual launch (verified by capturing the framebuffer post-boot). Buildroot's stock
-      `S40xorg` is removed by `board/common/post-build.sh` (the appliance uses Xvfb, not a
-      VT-bound Xorg). *Remaining:* the GPIO→uinput input bridge — hardware-only, can't be
-      exercised on the GPIO-less `virt` machine; on the emulator input is driven over
-      `input_hook.rpy`'s socket via `input_sender.py`. The Pi defconfig now carries the same
-      boot-to-game stack (`board/inky/` + `board/common/`), pending hardware validation.
+- [x] **Phase 4 — Boot-to-launcher + games + input (emulator).** The `inky-session`
+      service supervises `inky-launcher` (ADR 0009), which owns the display/input backends,
+      renders the game library + settings, and spawns Ren'Py games under an on-demand Xvfb —
+      launch, play, and exit of the bundled the_question verified end-to-end on the emulator
+      (frames over the TCP preview, input over the TCP source, hold-Start exit combo).
+      Buildroot's stock `S40xorg` is removed by `board/common/post-build.sh` (X only exists
+      while a game runs). The Pi defconfig carries the same stack plus the SPI/GPIO backends
+      (`board/inky/` + `board/common/`) — *pending physical-hardware validation (M5)*.
 - [ ] **Phase 5 — Hardening.** Read-only root + writable data partition for save survival.
 
 ---
