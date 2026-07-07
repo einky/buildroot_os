@@ -274,6 +274,73 @@ python3 ../launcher/tools/send_input.py --port 5334                           # 
 > script when the defconfig name matches a `# <name>` tag in Buildroot's `readme.txt`, and our
 > renamed `inky_qemu_defconfig` doesn't match. Use `./run-qemu.sh` instead.
 
+### End-to-end acceptance test (`make e2e`)
+
+`tests/e2e_emulator.py` is the unattended acceptance test for the emulator image. It boots the
+image with the **exact** `run-qemu.sh` command (`virt`, `-m 512`, host-forwarded ports — the
+`-m 512` is deliberate so a memory regression surfaces here), then drives a full session over
+the two TCP ports and asserts each stage in order:
+
+```bash
+./build.sh qemu     # build the emulator image first
+make e2e            # boot it and run the acceptance test (also: ./run-e2e.sh)
+```
+
+| Stage | What it asserts |
+|---|---|
+| **boot** | the launcher's first frame arrives on `:5333` and matches the committed golden `tests/goldens/library_first_frame.bin` (the library home screen — deterministic: same fonts baked in, no clock/battery) |
+| **input** | a button round-trips — `Start` opens Settings, `B` returns to the *same* library golden |
+| **game** | launching `the_question` (`A`) hands the panel to the game: frames start flowing and differ from the library (game frames are dithered photos — asserted by **invariants** (`>25%` black, `≠` launcher frames), not a brittle pixel golden) |
+| **session** | in the game: `down`+`start` begin the story, `a` advances dialogue, `b` opens/closes the in-game menu, and the **hold:start** exit combo returns to the library golden |
+| **reboot** | `Settings > Power > Restart > Confirm` really reboots the VM (`EINKY_ALLOW_POWER=1` in the emulator overlay) and the launcher comes back with the same golden |
+
+It reuses the frame/input wire clients from `../launcher/tools/frame_stream.py` (the single
+protocol implementation, shared with `dev_preview.py`) rather than re-deriving the byte format.
+
+**No fixed sleeps.** Every wait is a poll against a deadline. Ren'Py cold-starts under `llvmpipe`
+on 512 MB in tens of seconds to a couple of minutes, and the first few in-game inputs carry a
+JIT-warmup tail, so the deadlines are generous and **env-overridable**:
+
+| Env var | Default (s) | Wait it bounds |
+|---|---|---|
+| `EINKY_E2E_BOOT_TIMEOUT` | 240 | qemu start → first launcher frame |
+| `EINKY_E2E_INTERACT_TIMEOUT` | 30 | a launcher press → next frame |
+| `EINKY_E2E_GAME_BOOT_TIMEOUT` | 300 | launch → first game frame |
+| `EINKY_E2E_GAME_INPUT_TIMEOUT` | 120 | an in-game press → the game re-renders |
+| `EINKY_E2E_EXIT_TIMEOUT` | 90 | hold:start → library returns |
+| `EINKY_E2E_REBOOT_TIMEOUT` | 240 | confirm → launcher back after reboot |
+
+`E2E_TIMEOUT_MULT` scales **all** of the above at once (CI runs QEMU under TCG with
+no KVM for aarch64-on-x86, so the guest is several times slower — CI sets e.g.
+`E2E_TIMEOUT_MULT=3`).
+
+The frame connection **drops and reconnects** across the game handoff and the reboot (the
+launcher's `TcpFrameSink` re-accepts and replays the current frame); the client retries
+transparently within the deadline.
+
+**Metrics.** On success it prints one stable, parseable line for CI to track (step B3):
+
+```
+E2E_METRICS result=PASS boot_to_first_frame_s=13.5 boot_to_interactive_s=13.7 game_first_frame_s=118.9 reboot_to_first_frame_s=19.2
+```
+
+**On failure** it exits non-zero, prints the last ~100 lines of guest serial, and saves
+artifacts under `tests/.artifacts/` (git-ignored): the offending frame `FAIL_frame.png`, a
+`golden|actual|diff` strip for a golden mismatch, and the full `serial.log`.
+
+**Goldens.** `tests/goldens/*.bin` (raw 48 000-byte packed frames) are committed, with a `.png`
+alongside for review. Regenerate them *deliberately* after an intended UI change and eyeball the
+printed diff:
+
+```bash
+make e2e-bless      # or ./run-e2e.sh --bless
+```
+
+**Parallel runs / ports.** The test defaults to the same `5333`/`5334` host ports as
+`run-qemu.sh` and takes a per-port lockfile (`$TMPDIR/einky-e2e-5333.lock`) so a second run
+refuses rather than colliding. Use `--auto-ports` (or `--frame-port/--input-port`) to run two
+VMs at once.
+
 ### Hardware target — flashing to SD
 
 ```bash

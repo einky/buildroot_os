@@ -1,0 +1,25 @@
+# Nightly drift check: build the image from the PINNED tags (no OVERRIDE_SRCDIR)
+# so we catch the case where the committed runtime/launcher pins in the Buildroot
+# packages no longer build or no longer pass A1 -- something the PR jobs (which
+# always override with working-tree code) can never see.
+#
+# Note: with use_overrides=false the Buildroot packages fetch runtime/launcher
+# from their pinned git sources, so this needs those sources to be fetchable
+# (public, or a credentialed SIBLING_CHECKOUT_TOKEN available to the container).
+name: nightly-pins
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC daily (wall-clock only; the guest has no RTC)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-build:
+    name: pinned-tag image + A1 (drift check)
+    uses: ./.github/workflows/image-e2e.yml
+    with:
+      use_overrides: false
+    secrets: inherit

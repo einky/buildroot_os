@@ -1,0 +1,77 @@
+#!/bin/sh
+# Bring up the writable /data partition before the launcher session (S95) needs it.
+#
+# The rootfs is READ-ONLY; everything writable lives on a separate ext4 partition
+# labelled "data" (the Pi's 3rd SD partition / the QEMU 2nd virtio disk). This
+# script is the single "handle a blank or dirty filesystem" path for BOTH targets:
+#   * mkfs it on first boot if it has no filesystem yet (also the hook for the
+#     future expand-to-fill-card step),
+#   * fsck (journal replay) so a hard power cut self-heals,
+#   * mount it, create the state dirs, and seed the games from the read-only seed
+#     the image ships (so a rootfs reflash never wipes sideloaded games or saves).
+#
+# If the data device is missing or unrecoverable we do NOT wedge the box: we drop
+# a flag the launcher reads to show a clear "storage unavailable" screen.
+#
+# Config comes from /etc/default/inky-session (per-target device + paths).
+
+. /etc/default/inky-session 2>/dev/null || true
+
+DATA_DEV="${EINKY_DATA_DEV:-/dev/vdb}"
+DATA_MNT=/data
+STATE_DIR="${EINKY_STATE_DIR:-/data/inky}"
+GAMES_DIR="${EINKY_GAMES_DIR:-/data/games}"
+SEED_DIR="${EINKY_GAMES_SEED:-/usr/share/inky/games-seed}"
+ERROR_FLAG=/run/inky-data-error
+
+fail() {
+	echo "data: $1" >&2
+	# /run is tmpfs (writable even with a read-only root); the launcher polls this.
+	echo "$1" > "$ERROR_FLAG" 2>/dev/null || true
+}
+
+start() {
+	rm -f "$ERROR_FLAG"
+	if [ ! -b "$DATA_DEV" ]; then
+		fail "data device $DATA_DEV is missing"
+		return 0
+	fi
+
+	# Format on first boot: a brand-new SD partition / virtio disk has no fs yet.
+	if ! blkid "$DATA_DEV" | grep -q 'TYPE="ext4"'; then
+		echo "data: formatting $DATA_DEV as ext4 (label=data)"
+		if ! mkfs.ext4 -q -F -L data "$DATA_DEV"; then
+			fail "could not format $DATA_DEV"
+			return 0
+		fi
+	fi
+
+	# Journal replay / repair so an unclean power-off self-heals.
+	fsck.ext4 -p "$DATA_DEV" >/dev/null 2>&1 || true
+
+	mkdir -p "$DATA_MNT"
+	# Mount via the fstab entry (LABEL=data + the shared options); fall back to an
+	# explicit mount if the label lookup is not ready yet.
+	if ! mount "$DATA_MNT" 2>/dev/null; then
+		if ! mount -t ext4 -o noatime,commit=30,data=ordered "$DATA_DEV" "$DATA_MNT"; then
+			fail "could not mount $DATA_DEV on $DATA_MNT"
+			return 0
+		fi
+	fi
+
+	mkdir -p "$STATE_DIR" "$STATE_DIR/logs" "$STATE_DIR/home" "$GAMES_DIR"
+
+	# First-boot seed: populate games from the read-only seed only when empty, so a
+	# reflash (new rootfs) keeps the player's installed games and saves on /data.
+	if [ -d "$SEED_DIR" ] && [ -z "$(ls -A "$GAMES_DIR" 2>/dev/null)" ]; then
+		echo "data: seeding games from $SEED_DIR"
+		cp -a "$SEED_DIR"/. "$GAMES_DIR"/ || fail "could not seed games"
+	fi
+}
+
+case "$1" in
+	start) start ;;
+	stop) umount "$DATA_MNT" 2>/dev/null || true ;;
+	restart) "$0" stop; "$0" start ;;
+	*) echo "usage: $0 {start|stop|restart}"; exit 1 ;;
+esac

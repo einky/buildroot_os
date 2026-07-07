@@ -1,0 +1,160 @@
+# Reusable: build the InkyOS emulator image and run the A1 acceptance test.
+#
+# Any repo's CI calls this with ITS ref for its own repo and the default branch
+# for the others (the sibling checkout matrix is passed explicitly -- we never
+# assume a same-named branch exists in the other repos). The image is built with
+# OVERRIDE_SRCDIR so it contains the PR's runtime/launcher code, not the pinned
+# tags; the nightly drift check sets use_overrides=false to build the pins.
+#
+# This is the EXPENSIVE job: it needs Docker (br.sh is containerized), tens of GB
+# of disk, and hours on a cold cache (Mesa/LLVM) but minutes warm.
+name: image-e2e (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      buildroot_os_ref:
+        description: git ref of einky/buildroot_os to build
+        type: string
+        default: main
+      runtime_ref:
+        description: git ref of einky/runtime (OVERRIDE_SRCDIR)
+        type: string
+        default: main
+      launcher_ref:
+        description: git ref of einky/launcher (OVERRIDE_SRCDIR)
+        type: string
+        default: main
+      meta_ref:
+        description: git ref of einky/meta (contract + version pins)
+        type: string
+        default: main
+      use_overrides:
+        description: mount sibling checkouts as OVERRIDE_SRCDIR (false = build pinned tags)
+        type: boolean
+        default: true
+      timeout_mult:
+        description: A1 deadline multiplier (CI qemu is TCG-slow, no KVM for aarch64)
+        type: string
+        default: "4"
+      cache_bust:
+        description: bump to discard a poisoned .dl/.ccache
+        type: string
+        default: v1
+    secrets:
+      # Read-only token that can clone the sibling repos when they are private.
+      # Pass with `secrets: inherit` from the caller; falls back to the job token
+      # for public repos / same-repo runs.
+      SIBLING_CHECKOUT_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-e2e:
+    runs-on: ubuntu-latest # needs Docker + big disk; move to a larger runner if the build outgrows it
+    timeout-minutes: 300
+    steps:
+      - name: Free disk space (Buildroot Mesa/LLVM is large)
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+                      /usr/share/dotnet /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      - name: Checkout buildroot_os (+ Buildroot submodule)
+        uses: actions/checkout@v4
+        with:
+          repository: einky/buildroot_os
+          ref: ${{ inputs.buildroot_os_ref }}
+          path: buildroot_os
+          submodules: true
+          token: ${{ secrets.SIBLING_CHECKOUT_TOKEN || github.token }}
+
+      - name: Checkout meta (contract + version pins)
+        uses: actions/checkout@v4
+        with:
+          repository: einky/meta
+          ref: ${{ inputs.meta_ref }}
+          path: meta
+          token: ${{ secrets.SIBLING_CHECKOUT_TOKEN || github.token }}
+
+      # runtime + launcher are always checked out: the image build consumes them
+      # via OVERRIDE_SRCDIR (unless use_overrides=false), and the e2e harness
+      # imports launcher/tools/frame_stream.py regardless.
+      - name: Checkout runtime
+        uses: actions/checkout@v4
+        with:
+          repository: einky/runtime
+          ref: ${{ inputs.runtime_ref }}
+          path: runtime
+          token: ${{ secrets.SIBLING_CHECKOUT_TOKEN || github.token }}
+
+      - name: Checkout launcher
+        uses: actions/checkout@v4
+        with:
+          repository: einky/launcher
+          ref: ${{ inputs.launcher_ref }}
+          path: launcher
+          token: ${{ secrets.SIBLING_CHECKOUT_TOKEN || github.token }}
+
+      # Key caches on the Buildroot submodule SHA (+ a manual cache_bust) so a
+      # corrupt entry is discarded by bumping cache_bust and a Buildroot bump
+      # starts clean -- a poisoned ccache/dl can otherwise wedge every build.
+      - name: Resolve Buildroot submodule SHA
+        id: br
+        run: echo "sha=$(git -C buildroot_os/buildroot rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache downloads (.dl)
+        uses: actions/cache@v4
+        with:
+          path: buildroot_os/.dl
+          key: dl-${{ inputs.cache_bust }}-${{ steps.br.outputs.sha }}
+          restore-keys: dl-${{ inputs.cache_bust }}-
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: buildroot_os/.ccache
+          key: ccache-${{ inputs.cache_bust }}-${{ steps.br.outputs.sha }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ inputs.cache_bust }}-${{ steps.br.outputs.sha }}-
+            ccache-${{ inputs.cache_bust }}-
+
+      # Advisory: caching the whole output tree makes warm builds much faster, but
+      # a defconfig change MUST force a clean build, so the key includes the
+      # defconfig hash (a change misses the cache -> fresh tree).
+      - name: Cache output tree (advisory)
+        uses: actions/cache@v4
+        with:
+          path: buildroot_os/output-qemu
+          key: out-${{ inputs.cache_bust }}-${{ steps.br.outputs.sha }}-${{ hashFiles('buildroot_os/configs/inky_qemu_defconfig') }}
+
+      - name: Install host QEMU + Pillow (for the A1 harness)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-arm python3-pil
+
+      - name: Build emulator image
+        working-directory: buildroot_os
+        env:
+          # use_overrides=true -> '0' (mount siblings); false -> '1' (build pins).
+          # br.sh treats only INKY_NO_OVERRIDE=1 as "off" (empty '' is falsy in GH
+          # expressions, so we pass an explicit '0' for the on case).
+          INKY_NO_OVERRIDE: ${{ inputs.use_overrides && '0' || '1' }}
+        run: ./build.sh qemu
+
+      - name: A1 acceptance test
+        working-directory: buildroot_os
+        env:
+          E2E_TIMEOUT_MULT: ${{ inputs.timeout_mult }}
+        run: make e2e
+
+      - name: Upload A1 failure artifacts (frames + serial)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a1-artifacts-${{ github.run_id }}-${{ github.job }}
+          path: buildroot_os/tests/.artifacts/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -22,4 +22,7 @@
 # Python bytecode (scripts/)
 __pycache__/
 
+# e2e emulator test artifacts (failure frames + serial logs); goldens ARE tracked.
+/tests/.artifacts/
+
 CLAUDE.md

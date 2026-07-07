@@ -40,18 +40,25 @@ TTY_FLAGS=(-i)
 # /runtime (read-only) and build the inky-runtime package from it via Buildroot's
 # OVERRIDE_SRCDIR, so the private repo needs no network/credentials. Without the
 # sibling, inky-runtime falls back to its pinned git source.
+#
+# INKY_NO_OVERRIDE=1 forces the pinned git sources even when the siblings ARE
+# present -- the nightly "does the pinned tag still build?" drift check needs the
+# sibling checkouts on disk for the e2e test harness but must NOT let them
+# override the packages' pinned commits.
 RUNTIME_SRC="$(cd "$REPO/.." && pwd)/runtime"
 LAUNCHER_SRC="$(cd "$REPO/.." && pwd)/launcher"
 RUNTIME_MOUNT=()
 MAKE_OVERRIDE=()
-if [ -d "$RUNTIME_SRC" ]; then
-  RUNTIME_MOUNT=(-v "$RUNTIME_SRC":/runtime:ro)
-  MAKE_OVERRIDE=(INKY_RUNTIME_OVERRIDE_SRCDIR=/runtime)
-fi
-# Same OVERRIDE_SRCDIR trick for the sibling `launcher` checkout (ADR 0009).
-if [ -d "$LAUNCHER_SRC" ]; then
-  RUNTIME_MOUNT+=(-v "$LAUNCHER_SRC":/launcher:ro)
-  MAKE_OVERRIDE+=(INKY_LAUNCHER_OVERRIDE_SRCDIR=/launcher)
+if [ "${INKY_NO_OVERRIDE:-}" != "1" ]; then
+  if [ -d "$RUNTIME_SRC" ]; then
+    RUNTIME_MOUNT=(-v "$RUNTIME_SRC":/runtime:ro)
+    MAKE_OVERRIDE=(INKY_RUNTIME_OVERRIDE_SRCDIR=/runtime)
+  fi
+  # Same OVERRIDE_SRCDIR trick for the sibling `launcher` checkout (ADR 0009).
+  if [ -d "$LAUNCHER_SRC" ]; then
+    RUNTIME_MOUNT+=(-v "$LAUNCHER_SRC":/launcher:ro)
+    MAKE_OVERRIDE+=(INKY_LAUNCHER_OVERRIDE_SRCDIR=/launcher)
+  fi
 fi
 
 DOCKER_RUN=(docker run --rm "${TTY_FLAGS[@]}"

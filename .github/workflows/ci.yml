@@ -1,0 +1,55 @@
+# buildroot_os CI: a fast contract/pin parity gate on every push/PR, plus the
+# expensive image build + A1 acceptance test (skippable by a `docs-only` label).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Fast gate: the committed contract-derived files and the version pins must
+  # still match meta/ + the Buildroot submodule. Cheap; runs on every change.
+  contract-and-pins:
+    name: contract + version-pin parity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout buildroot_os (+ Buildroot submodule for the pin check)
+        uses: actions/checkout@v4
+        with:
+          path: buildroot_os
+          submodules: true
+      - name: Checkout meta (single source of truth)
+        uses: actions/checkout@v4
+        with:
+          repository: einky/meta
+          path: meta
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: hardware contract parity (gen_hardware.py --check)
+        working-directory: buildroot_os
+        env:
+          EINKY_META_DIR: ${{ github.workspace }}/meta
+        run: python3 scripts/gen_hardware.py --check
+      - name: version-pin parity (check_pins.py)
+        working-directory: buildroot_os
+        env:
+          EINKY_META_DIR: ${{ github.workspace }}/meta
+        run: python3 scripts/check_pins.py
+
+  # Expensive: build the emulator image with THIS ref and run A1 on it. Skipped
+  # when the PR is labelled `docs-only`. Always runs on push to main.
+  image-e2e:
+    name: emulator image + A1
+    needs: contract-and-pins
+    if: ${{ github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'docs-only') }}
+    uses: ./.github/workflows/image-e2e.yml
+    with:
+      buildroot_os_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      # runtime / launcher / meta default to main (explicit checkout matrix:
+      # a buildroot_os PR does not imply same-named branches elsewhere).
+    secrets: inherit
