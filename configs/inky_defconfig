@@ -25,6 +25,10 @@ BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_TARBALL=y
 BR2_LINUX_KERNEL_CUSTOM_TARBALL_LOCATION="$(call github,raspberrypi,linux,21b410140c47ffab5668399f6f143c7d7b935c8b)/linux-21b410140c47ffab5668399f6f143c7d7b935c8b.tar.gz"
 BR2_LINUX_KERNEL_DEFCONFIG="bcm2711"
+# The bcm2711 defconfig builds the SPI drivers (and /dev/gpiomem) as modules,
+# but InkyOS has no udev/mdev and loads no modules at boot, so /dev/spidev0.0
+# never appeared on hardware. The fragment builds the panel + input drivers in.
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_INKY_PATH)/board/inky/linux.fragment"
 BR2_LINUX_KERNEL_DTS_SUPPORT=y
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="broadcom/bcm2710-rpi-zero-2-w"
 BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
