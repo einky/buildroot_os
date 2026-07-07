@@ -2,9 +2,23 @@
 # Sourced by /usr/bin/inky-session; read by the launcher. See
 # package/inky-session/inky-session.sh.
 
-# Display: push 1-bit frames to the GDEM0397T81P over SPI via runtime's C driver.
+# Display: push 1-bit frames to the GDEM0397T81P (SSD1677 controller) over SPI
+# via runtime's C driver.
 export EINKY_DISPLAY_BACKEND=spi
 export EINKY_SPI_DEV=/dev/spidev0.0
+
+# ── Panel driver bring-up knobs (SSD1677) ────────────────────────────────────
+# These are read by the C driver at runtime, so they can be tuned here and
+# picked up with `S95inky-session restart` -- no image rebuild. Uncomment/edit:
+#   EINKY_INVERT_FRAME=1   flip if the panel comes up as a photo-negative
+#                          (default 0: SSD1677 BW RAM bit 1 = white, matching
+#                          the pipeline's packed_white_is_one).
+#   EINKY_SPI_HZ=8000000   lower the SPI clock if writes come back garbled
+#                          (default 10 MHz).
+#   EINKY_SPI_DEBUG=1      log each refresh + BUSY-wait timing to the launcher log.
+# export EINKY_INVERT_FRAME=1
+# export EINKY_SPI_HZ=8000000
+# export EINKY_SPI_DEBUG=1
 
 # Input: read the 7 GPIO buttons directly (python-gpiod on the gpiochip
 # character device). The launcher owns the buttons itself -- no xdotool / Xvfb
