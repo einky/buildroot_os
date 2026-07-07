@@ -22,6 +22,11 @@ export HOME=/root
 # audio, engine-capture socket paths). Harmless when no game is running.
 export DISPLAY=:0
 export LIBGL_ALWAYS_SOFTWARE=1
+# Cap llvmpipe to one worker thread: on the 512 MB Pi Zero 2 W its per-thread
+# tile buffers are pure memory cost, and e-ink runs at ~2 FPS so the lost
+# parallelism is invisible. Pairs with the image-cache cap + zram (memory
+# budget, see docs/software/eink-playbook.md).
+export LP_NUM_THREADS=1
 export SDL_AUDIODRIVER=dummy
 export RENPY_EINK_SOCKET=/tmp/renpy-eink.sock
 export RENPY_INPUT_SOCKET=/tmp/renpy-input.sock

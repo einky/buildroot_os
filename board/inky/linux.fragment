@@ -14,3 +14,9 @@
 # (enabled in config.txt with dtparam=spi=on).
 CONFIG_SPI_BCM2835=y
 CONFIG_SPI_SPIDEV=y
+
+# Compressed RAM swap. The bcm2711 defconfig builds zram as a module, but InkyOS
+# loads none, so build it in -- the 512 MB Pi has no disk swap and Ren'Py +
+# llvmpipe OOM without a backstop (the S06zram init script sets it up). The lz4
+# backend and zsmalloc allocator are already =y in the base defconfig.
+CONFIG_ZRAM=y

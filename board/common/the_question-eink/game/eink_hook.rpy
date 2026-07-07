@@ -1,6 +1,13 @@
 # Ships one PNG per stable frame to an external receiver over a unix socket.
 # Pairs with eink_receiver.py at the repo root.
 
+## Device memory budget (Pi Zero 2 W: 512 MB RAM, no disk swap). Ren'Py's stock
+## image cache is 400 MB -- larger than half the box's RAM -- which OOM-kills the
+## game on this hardware. An 800x480 1-bit panel needs only a small cache. Set
+## in the e-ink hook so it applies to every game the launcher runs on-device.
+## Tunable: raise if images visibly re-decode (thrash), lower if memory is tight.
+define config.image_cache_size_mb = 64
+
 init python:
     import socket
     import struct

@@ -1,0 +1,38 @@
+#!/bin/sh
+# Compressed RAM swap for the Pi Zero 2 W (512 MB, no disk swap). Without it,
+# Ren'Py + llvmpipe memory spikes trip the kernel OOM killer mid-game. This is
+# best-effort: it must NEVER wedge boot, so every step tolerates failure and the
+# script always exits 0.
+#
+# Sizing: a 384 MB zram device backed by ~150-200 MB of physically-compressed
+# RAM (lz4, ~2x) -- a headroom cushion, not the primary fix (the launcher caps
+# Ren'Py's image cache). lz4 is chosen over zstd: far cheaper CPU on the A53,
+# which llvmpipe already saturates.
+
+ZRAM_DEV=/dev/zram0
+ZRAM_SYS=/sys/block/zram0
+ZRAM_SIZE=384M
+ZRAM_COMP=lz4
+
+case "$1" in
+	start)
+		[ -d "$ZRAM_SYS" ] || { echo "zram: not available, skipping"; exit 0; }
+		# comp_algorithm must be set before disksize (immutable afterwards).
+		echo "$ZRAM_COMP" > "$ZRAM_SYS/comp_algorithm" 2>/dev/null
+		if ! echo "$ZRAM_SIZE" > "$ZRAM_SYS/disksize" 2>/dev/null; then
+			echo "zram: could not set disksize, skipping"
+			exit 0
+		fi
+		mkswap "$ZRAM_DEV" >/dev/null 2>&1
+		if swapon "$ZRAM_DEV" 2>/dev/null; then
+			echo "zram: $ZRAM_SIZE swap active ($ZRAM_COMP)"
+		fi
+		# Swap readily to zram (cheap) and drop swap readahead (pointless for RAM).
+		echo 100 > /proc/sys/vm/swappiness 2>/dev/null
+		echo 0 > /proc/sys/vm/page-cluster 2>/dev/null
+		;;
+	stop)
+		swapoff "$ZRAM_DEV" 2>/dev/null
+		;;
+esac
+exit 0
