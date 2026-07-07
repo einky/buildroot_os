@@ -30,6 +30,15 @@ config BR2_PACKAGE_INKY_RUNTIME_SPI
 	select BR2_PACKAGE_PYTHON_CFFI      # _spi_driver runtime import
 	select BR2_PACKAGE_LIBGPIOD         # _spi_driver links -lgpiod (DC/RST/BUSY)
 	select BR2_PACKAGE_PYTHON_GPIOZERO  # input.handler GPIO reader
+	# gpiozero imports colorzero at package init. Buildroot's python-gpiozero
+	# does `select BR2_PACKAGE_PYTHON_COLORZERO`, but kconfig drops selects
+	# made by a symbol whose own dependencies are unmet -- and python-gpiozero
+	# `depends on BR2_arm` (32-bit only; stale upstream restriction, the
+	# package is pure Python), which is false on our aarch64 target. So the
+	# select above force-enables gpiozero (with an "unmet direct dependencies"
+	# warning) while its colorzero select silently vanishes. Select the
+	# runtime dep explicitly.
+	select BR2_PACKAGE_PYTHON_COLORZERO
 	select BR2_PACKAGE_PYTHON_RPI_GPIO  # gpiozero pin factory on the Pi
 	select BR2_PACKAGE_XDOTOOL          # input.handler keysym injection
 	help
